@@ -3,7 +3,7 @@
 [![Open the web app / Webアプリを開く](docs/assets/button-open.png)](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
 [![Download the manual PDF / 操作マニュアルPDFをダウンロード](docs/assets/button-manual.png)](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases/latest/download/nazori-kun-manual.pdf)
 
-[Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
+[v0.1.4 walkthrough (YouTube) / v0.1.4の操作動画（YouTube）](https://youtu.be/Zf8ESjz5FSs) · [Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
 
 Watch a pen retrace the lines in an illustration. On a color original, a brush then applies colors sampled from the same image. When the drawing ends, the workspace puts the original beside the reconstructed result. / イラストを読み込み、ペン先が元絵をなぞって線を引き直すところを見られます。カラー原稿ではその後、筆が元絵から拾った色を塗ります。工程が終わると、作業画面に元絵とトレス結果が並びます。
 
