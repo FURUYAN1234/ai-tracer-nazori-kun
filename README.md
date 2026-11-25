@@ -10,6 +10,8 @@ Use the public app or build the static files and serve the `dist` folder locally
 
 [Open the app / アプリを開く](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
 
+[Demo and guide / 実演・解説](https://note.com/happy_duck780/n/n75301de9493a) · [AI Manga Creative Suite / AIまんが制作エコシステム](https://note.com/happy_duck780/n/nbdf826604ce7)
+
 ```powershell
 npm run build
 python -m http.server 8756 --bind 127.0.0.1 --directory dist
