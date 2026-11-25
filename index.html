@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <script defer src="engine.js"></script>
   <script defer src="psd.js"></script>
+  <script defer src="raster-source.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -98,6 +99,11 @@
               </div>
               <button id="export" class="ink-button" type="button">保存</button>
             </div>
+            <div id="export-size-control" class="export-size" hidden>
+              <label for="export-size">保存サイズ</label>
+              <select id="export-size" aria-describedby="export-size-note"></select>
+            </div>
+            <p id="export-size-note" class="hint"></p>
             <p id="export-help" class="hint"></p>
             <p id="export-status" class="hint" role="status"></p>
           </section>

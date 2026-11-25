@@ -6,7 +6,7 @@ import { secureHtml, verifyBuiltSecurity } from './web-security.mjs';
 
 export const project = fileURLToPath(new URL('../', import.meta.url));
 export const publicFiles = [
-  'app.js', 'engine.js', 'psd.js', 'style.css', 'LICENSE',
+  'app.js', 'engine.js', 'psd.js', 'raster-source.js', 'export-worker.js', 'style.css', 'LICENSE',
   'downloads/nazori-kun-manual.pdf',
   'examples/mono.png', 'examples/color.png',
   'examples/detailed-mono.png', 'examples/detailed-color.png',

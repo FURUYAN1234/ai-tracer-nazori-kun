@@ -1,4 +1,4 @@
-# AI Tracer Nazori-kun v0.1.3 Technical Report
+# AI Tracer Nazori-kun v0.1.4 Technical Report
 
 November 25, 2026 · FURU
 
@@ -16,6 +16,8 @@ AI assisted with implementation. The main tracing and original-color recovery us
 4. **Coloring.** For colored sources, representative colors and ink boundaries determine the color regions. The virtual brush reveals color in passes restricted to a color mask. Tracing monochrome input produces line art. A color original receives its own color layers, which can be adjusted individually.
 
 ## Exports and integration
+
+The workspace and WebM replay use a preview with a long edge of at most 1,600 pixels and a common scale on both axes. For original-size export, a web worker decodes the original file and rebuilds geometry from its pixels. The preview palette and color edits are preserved by projecting markers and separators into the original coordinate space. Import accepts up to 32 million pixels. Original-size export accepts up to 16 million pixels, subject to contour and layer complexity limits.
 
 PNG provides a composite. PSD contains transparent ink, separate layers for assigned colors, and paper. SVG stores editable pen perimeters and color shapes. Coordinate JSON uses source pixels with a top-left origin. WebM records the replay. Project JSON retains originals, pen settings, color assignments, boundary edits, and speed settings.
 

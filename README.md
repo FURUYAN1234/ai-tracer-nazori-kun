@@ -48,6 +48,12 @@ Open a thumbnail from **画像一覧**, or use **保存…** above an image in t
 
 For the full illustrated workflow, choose **操作マニュアル PDF** in the application header. The PDF includes the file types, API settings, and local MCP setup. / 画面上部の **操作マニュアル PDF** で、画像付きの手順、保存形式、API設定とローカルMCP連携を確認できます。
 
+### Original-size export / 元寸保存
+
+Each import retains its aspect ratio. The workspace and WebM replay use a preview of up to 1,600 pixels on the long edge. For larger inputs up to 16 million pixels, the image preview offers **元寸** (original size, selected by default) and **プレビュー寸法** (preview size). Original-size PNG, PSD, SVG and coordinate JSON are traced from the original pixels on save, with the selected pen and color edits. Project JSON retains the compressed original when original-size export is available. / 原稿ごとに縦横比を保ち、作業画面とWebMは長辺1,600pxまでで再生します。より大きく1,600万画素以下の原稿では、画像プレビューの **保存サイズ** で **元寸**（初期選択）または **プレビュー寸法** を選べます。元寸では保存時に元の画素をトレスし、ペン・配色の設定を反映してPNG・PSD・SVG・座標JSONを保存します。元寸保存可能な原稿の圧縮原本はプロジェクトJSONにも入ります。
+
+Inputs above 16 million pixels are saved at preview size. Import is limited to 32 million pixels, 8,192 pixels per edge and 24 MB per file. Complex contours or layer data can also exceed the original-size budget. The save screen gives the reason and keeps preview-size export available. / 1,600万画素を超える原稿はプレビュー寸法で保存します。取り込みは3,200万画素、各辺8,192px、1枚24 MBまでです。輪郭やレイヤーの量が上限を超えたときも、理由を画面に表示し、プレビュー寸法で保存できます。
+
 ## Design and provenance / 設計と来歴
 
 The application extracts closed outlines around ink, preserves enclosed holes, reconstructs ink from crossings of those outlines, and applies pen weight to the reconstructed ink. The perimeter traversal determines when ink appears. A separate connected-region pass assigns colors, and a clipped back-and-forth brush pass makes the paint visible during replay. / インクの外周と中の穴を閉経路として抽出し、経路との交点から線を再構成してペンタッチを加えます。輪郭を通過した時刻に合わせて線が現れます。彩色は別に領域を抽出し、領域内を往復する筆の動きに合わせて色を出します。
@@ -62,7 +68,7 @@ The system is intended for illustrations with identifiable ink and flat colors. 
 
 ## Mathematics of the drawing pipeline / 描画ルーチンの数理
 
-The equations below describe the v0.1.3 implementation. AI-assisted development and the ImageGen sample artwork are part of the project's provenance. The drawing engine uses fixed numerical rules on the supplied raster and settings. / 以下はv0.1.3の実装に沿った数式です。開発ではAIのコーディング支援を、付属作例の制作ではImageGenを使いました。実行時のエンジンは、入力画像と設定に対してコードで定めた計算を行います。
+The equations below describe the drawing engine. AI-assisted development and the ImageGen sample artwork are part of the project's provenance. The engine uses fixed numerical rules on the supplied raster and settings. / 以下は描画エンジンの実装に沿った数式です。開発ではAIのコーディング支援を、付属作例の制作ではImageGenを使いました。実行時のエンジンは、入力画像と設定に対してコードで定めた計算を行います。
 
 ### 1. Pixel scores and thresholding / 画素のスコアと二値化
 

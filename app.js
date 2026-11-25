@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const E = window.KomaEngine;
+  const raster = window.NazoriRaster;
   const $ = id => document.getElementById(id);
   const limit = 8;
   const roleLimit = 300;
@@ -16,6 +17,8 @@
   let busy = false;
   let recording = false;
   let exportSelection;
+  let savingExport = false;
+  let savingProject = false;
   let colorEdit;
   let palettePanel;
   const colorChannels = [...document.querySelectorAll('[data-color-channel]')];
@@ -448,39 +451,85 @@
     setTimeout(() => URL.revokeObjectURL(href), 30000);
   }
 
-  function saveProject() {
+  function blobDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function base64Image(encoded, type) {
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type });
+  }
+
+  async function saveProject() {
+    if (savingProject || savingExport) return;
+    savingProject = true;
+    $('save-project').disabled = true;
     const data = {
       format: 'koma-iro/1', name: state.name, threshold: state.threshold, pen: state.pen, strength: state.strength, roles: state.roles,
       preferences: { index: selection.index, variant: selection.variant, role: selection.role,
         drawSpeed: Number($('draw-speed').value), playbackSpeed: Number($('speed').value) },
-      panels: state.panels.map(({ name, markers, sourceRoles, barriers, traced }, i) =>
-        ({ name, markers, sourceRoles, barriers, traced, source: output(state.panels[i], 'source').toDataURL('image/png') })),
     };
-    download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'koma-iro-project.json');
-    report('プロジェクトのダウンロードを開始しました。');
+    const panels = state.panels;
+    try {
+      data.panels = [];
+      let sourceBytes = 0;
+      for (const panel of panels) {
+        const { name, markers, sourceRoles, barriers, traced, originalFile, originalWidth, originalHeight } = panel;
+        const record = { name, markers, sourceRoles, barriers, traced, source: output(panel, 'source').toDataURL('image/png') };
+        if (originalWidth) {
+          record.originalWidth = originalWidth;
+          record.originalHeight = originalHeight;
+        }
+        sourceBytes += record.source.length + (originalFile ? Math.ceil(originalFile.size / 3) * 4 : 0);
+        if (sourceBytes > projectLimit) throw new Error('プロジェクトが85 MBを超えています。原稿を分けて保存してください。');
+        if (originalFile) record.original = await blobDataUrl(originalFile);
+        data.panels.push(record);
+      }
+      const file = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      if (file.size > projectLimit) throw new Error('プロジェクトが85 MBを超えています。原稿を分けて保存してください。');
+      download(file, 'koma-iro-project.json');
+      report('プロジェクトのダウンロードを開始しました。');
+    } catch (error) {
+      report(error.message || 'プロジェクトを保存できませんでした。');
+    } finally {
+      savingProject = false;
+      $('save-project').disabled = false;
+    }
   }
 
+  const projectLimit = 85 * 1024 * 1024;
   const colorPattern = /^#[0-9a-f]{6}$/i;
   const rolePattern = /^(?!constructor$|prototype$|__proto__$)[a-z][a-z0-9-]{0,45}$/;
   const title = (s, max) => typeof s === 'string' && s.length > 0 && s.length <= max;
   const coordinate = (n, size) => Number.isInteger(n) && n >= 0 && n < size;
 
   async function bitmapToInk(file) {
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('PNG、JPEG、WebPを読み込めます。');
-    if (file.size > 24 * 1024 * 1024) throw new Error('画像は1枚あたり24 MBまでです。');
+    await raster.inspectFile(file);
     const bitmap = await createImageBitmap(file);
     try {
-      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-      const image = canvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
+      const { width: originalWidth, height: originalHeight } = bitmap;
+      raster.checkInputSize(originalWidth, originalHeight);
+      const { width, height } = raster.previewSize(originalWidth, originalHeight);
+      const image = canvas(width, height);
       image.getContext('2d').drawImage(bitmap, 0, 0, image.width, image.height);
-      return readInk(image);
+      const drawing = readInk(image);
+      if (width === originalWidth && height === originalHeight) return drawing;
+      return { ...drawing, originalWidth, originalHeight,
+        originalFile: raster.canExportOriginal(originalWidth, originalHeight) ? file : null };
     } finally {
       bitmap.close();
     }
   }
 
   async function readProject(file) {
-    if (file.size > 85 * 1024 * 1024) throw new Error('プロジェクトは85 MBまでです。');
+    if (file.size > projectLimit) throw new Error('プロジェクトは85 MBまでです。');
     const data = JSON.parse(await file.text());
     if (!data || data.format !== 'koma-iro/1' || !title(data.name, 120)
         || !Number.isInteger(data.threshold) || data.threshold < 32 || data.threshold > 248
@@ -496,9 +545,29 @@
           || !Array.isArray(panel.barriers) || panel.barriers.length > 3000 || typeof panel.source !== 'string'
           || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(panel.source))
         throw new Error('プロジェクトの原稿データが壊れています。');
-      const bytes = Uint8Array.from(atob(panel.source.split(',')[1]), char => char.charCodeAt(0));
-      const drawing = await bitmapToInk(new Blob([bytes], { type: 'image/png' }));
+      const drawing = await bitmapToInk(base64Image(panel.source.split(',')[1], 'image/png'));
       const { width, height } = drawing;
+      if (panel.original !== undefined || panel.originalWidth !== undefined || panel.originalHeight !== undefined) {
+        const { original, originalWidth, originalHeight } = panel;
+        raster.checkInputSize(originalWidth, originalHeight);
+        const preview = raster.previewSize(originalWidth, originalHeight);
+        if (preview.width !== width || preview.height !== height)
+          throw new Error('プロジェクトの原本とプレビューの寸法が一致しません。');
+        drawing.originalWidth = originalWidth;
+        drawing.originalHeight = originalHeight;
+        if (original !== undefined) {
+          const match = typeof original === 'string' && original.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
+          if (!match || match[2].length > Math.ceil(raster.fileLimit / 3) * 4
+              || !raster.canExportOriginal(originalWidth, originalHeight))
+            throw new Error('プロジェクトの原本データが壊れています。');
+          const blob = base64Image(match[2], match[1]);
+          const size = await raster.inspectFile(blob);
+          const same = size.width === originalWidth && size.height === originalHeight;
+          const rotated = size.width === originalHeight && size.height === originalWidth;
+          if (!same && !rotated) throw new Error('プロジェクトの原本の寸法が一致しません。');
+          drawing.originalFile = blob;
+        }
+      }
       const sourceRoles = panel.sourceRoles ?? [];
       const validRole = role => role === null || roles.has(role);
       if (!Array.isArray(sourceRoles) || sourceRoles.length > 34 || !sourceRoles.every(validRole)
@@ -515,7 +584,7 @@
   async function readFiles(input, action) {
     const files = [...input.files];
     input.value = '';
-    if (!files.length || busy) return;
+    if (!files.length || busy || savingExport || savingProject) return;
     const importing = input === $('images');
     busy = true;
     $('import').disabled = $('open-project').disabled = true;
@@ -584,11 +653,53 @@
       option.hidden = option.disabled = !formats.includes(option.value);
     }
     field.value = 'png';
+    const sizeField = $('export-size');
+    sizeField.replaceChildren();
+    $('export-size-control').hidden = !panel.originalFile;
+    if (panel.originalFile) {
+      sizeField.add(new Option('元寸 ' + dimensions(panel.originalWidth, panel.originalHeight), 'original'));
+      sizeField.add(new Option('プレビュー寸法 ' + dimensions(panel.width, panel.height), 'preview'));
+    }
+    $('export-size-note').textContent = panel.originalFile
+      ? '画面は ' + dimensions(panel.width, panel.height) + ' のプレビューです。元寸を選ぶと保存時に原本から処理します。'
+      : panel.originalWidth ? '原稿は元寸保存の上限（1,600万画素）を超えています。保存寸法は '
+        + dimensions(panel.width, panel.height) + ' です。'
+        : '保存寸法は ' + dimensions(panel.width, panel.height) + ' です。';
     $('export-help').textContent = mode === 'source' ? '元絵は PNG で保存できます。'
       : formats.length === 2 ? '色レイヤー付きの PSD と座標 JSON は、配色 A または B の画像から保存できます。' : '';
     $('export-status').textContent = '';
     renderScreen();
     $('export-heading').focus();
+  }
+
+  function dimensions(width, height) {
+    return width + ' × ' + height + ' px';
+  }
+
+  function originalExport(panel, mode, type) {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker('export-worker.js');
+      const finish = (callback, value) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        callback(value);
+      };
+      const timeout = setTimeout(() => finish(reject, new Error('元寸保存が時間内に終わりませんでした。プレビュー寸法で保存できます。')), 120000);
+      worker.onmessage = ({ data }) => data.blob
+        ? finish(resolve, data.blob)
+        : finish(reject, new Error(data.error || '元寸で保存できませんでした。'));
+      worker.onerror = () => finish(reject, new Error('元寸で保存できませんでした。プレビュー寸法で保存できます。'));
+      worker.onmessageerror = worker.onerror;
+      try {
+        const { width, height, markers, barriers, sourceRoles, palette: sourcePalette,
+          originalFile, originalWidth, originalHeight } = panel;
+        worker.postMessage({ file: originalFile, originalWidth, originalHeight,
+          panel: { width, height, markers, barriers, sourceRoles, palette: sourcePalette },
+          roles: panelRoles(panel), threshold: state.threshold, pen: state.pen, strength: state.strength, mode, type });
+      } catch (error) {
+        finish(reject, error);
+      }
+    });
   }
 
   function clearExport() {
@@ -1120,12 +1231,32 @@
     setImportFeedback();
     report(panels.length + '枚を読み込みました。「トレスする」で処理を開始します。');
   });
-  $('export').onclick = () => {
+  $('export').onclick = async () => {
     const target = exportSelection;
-    if (!target) return;
+    if (!target || savingExport || savingProject || busy) return;
     const { panel, mode } = target;
     const type = $('export-type').value;
     if ($('export-type').selectedOptions[0]?.disabled) return;
+    if (panel.originalFile && $('export-size').value === 'original') {
+      savingExport = true;
+      const locked = ['export', 'export-type', 'export-size', 'close-export', 'import', 'open-project', 'save-project',
+        'work-screen', 'image-screen'].map($);
+      const previous = locked.map(input => input.disabled);
+      locked.forEach(input => { input.disabled = true; });
+      $('export-status').textContent = '元寸で処理中…';
+      try {
+        const blob = await originalExport(panel, mode, type);
+        const suffix = type === 'png' ? '-' + mode : type === 'json' ? '-coordinates'
+          : mode === 'b' ? '-b' : type === 'svg' && mode === 'ink' && panelHasColor(panel) ? '-ink' : '';
+        downloadExport(blob, panel.name + suffix + '-original.' + type);
+      } catch (error) {
+        $('export-status').textContent = error.message || '元寸で保存できませんでした。プレビュー寸法で保存できます。';
+      } finally {
+        savingExport = false;
+        locked.forEach((input, i) => { input.disabled = previous[i]; });
+      }
+      return;
+    }
     try {
       if (type === 'psd') return savePsd(panel, mode);
       if (type === 'svg' || type === 'json') return saveVector(type, panel, mode);

@@ -35,8 +35,10 @@ test('the public build is versioned, cannot request remote data, and contains on
     assert.match(html, /<section id="export-page" aria-labelledby="export-heading" hidden>/);
     assert.match(html, /id="image-screen"[^>]*>画像一覧<\/button>/);
     assert.match(html, /id="export"[^>]*>保存<\/button>/);
+    assert.match(html, /id="export-size"/);
+    assert.match(html, /worker-src 'self'/);
     assert.deepEqual((await readdir(output)).sort(), [
-      '.nojekyll', 'LICENSE', 'app.js', 'downloads', 'engine.js', 'examples', 'index.html', 'psd.js', 'style.css',
+      '.nojekyll', 'LICENSE', 'app.js', 'downloads', 'engine.js', 'examples', 'export-worker.js', 'index.html', 'psd.js', 'raster-source.js', 'style.css',
     ]);
     assert.match(html, /href="downloads\/nazori-kun-manual\.pdf"[^>]*>操作マニュアル/);
     const manual = await readFile(join(output, 'downloads', 'nazori-kun-manual.pdf'));

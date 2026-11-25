@@ -1,5 +1,29 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const Raster = require('./raster-source.js');
+
+test('reads source dimensions and rejects oversized images before raster decoding', () => {
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000bb800000fa0', 'hex');
+  const jpeg = Buffer.from('ffd8ffe000044a46ffc0000b080fa00bb801011100', 'hex');
+  const webp = Buffer.from('524946461600000057454250565038580a00000000000000b70b009f0f00', 'hex');
+  for (const [bytes, type] of [[png, 'image/png'], [jpeg, 'image/jpeg'], [webp, 'image/webp']]) {
+    assert.deepEqual(Raster.sourceSize(bytes, type), { width: 3000, height: 4000 });
+  }
+  assert.deepEqual(Raster.previewSize(3000, 4000), { width: 1200, height: 1600 });
+  assert.deepEqual(Raster.previewSize(4200, 1800), { width: 1600, height: 686 });
+  assert.deepEqual(Raster.previewSize(101, 704), { width: 101, height: 704 });
+  assert.equal(Raster.canExportOriginal(3000, 4000), true);
+  assert.equal(Raster.canExportOriginal(6000, 4000), false);
+  assert.throws(() => Raster.checkInputSize(8000, 8000), /3,200万/);
+});
+
+test('original-size export projects edits in pixel-center coordinates', () => {
+  const panel = { width: 1200, height: 1600, markers: [{ x: 600, y: 1200, role: 'blue' }],
+    barriers: [[0, 0, 1199, 1599]] };
+  const edits = Raster.scaleEdits(panel, 3000, 4000);
+  assert.deepEqual(edits.markers, [{ x: 1501, y: 3001, role: 'blue' }]);
+  assert.deepEqual(edits.barriers, [[0, 0, 2999, 3999]]);
+});
 const { segment, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, stylizeInk, inspectRaster, sampleColors, makeLayers } = require('./engine.js');
 
 function drawing(rows) {
