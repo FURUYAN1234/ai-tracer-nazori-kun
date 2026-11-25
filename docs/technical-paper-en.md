@@ -6,6 +6,8 @@ November 25, 2026 · FURU
 
 Nazori-kun reads a raster illustration as an underdrawing and replays inking and coloring in a browser. The result can be exported as a composite image, closed paths, or separate editable color layers. The browser processes the source locally and requires no API key.
 
+AI assisted with implementation. The main tracing and original-color recovery use image-processing algorithms.
+
 ## Method
 
 1. **Ink detection.** For monochrome sources, the detector uses luminance over white. For color sources, it combines darkness, chroma, and contrast on either side of a candidate line. This helps separate thin dark lines from broad dark fills.

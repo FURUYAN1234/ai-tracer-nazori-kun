@@ -2,6 +2,8 @@
 
 A local drawing simulator that traces an underdrawing, replays the pen and brush, and exports individually editable colors. / 下絵をトレスするペンと塗り筆の動きをその場で見せ、仕上がりを色別のレイヤーで保存するローカルアプリです。
 
+AI assisted with writing the software. The main tracing and original-color recovery run as image-processing algorithms in the browser. / コーディングにはAIを使いました。トレスと元色の復元を行うのは、ブラウザー内で動く画像処理アルゴリズムです。
+
 ## Run / 起動
 
 Use the public app or build the static files and serve the `dist` folder locally. The browser processing uses no account or API key. / 公開アプリを開くか、このフォルダーでビルドして `dist` をローカルに表示します。ブラウザー内の処理にアカウントやAPIキーは不要です。

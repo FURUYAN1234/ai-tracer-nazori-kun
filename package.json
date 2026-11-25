@@ -9,6 +9,8 @@
     "test": "node --test engine.test.cjs tests/public-build.test.mjs",
     "build": "node scripts/build-public.mjs",
     "postbuild": "node scripts/web-security.mjs --verify-dist",
+    "release:preflight": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\release_app_preflight.ps1 -App ai-tracer-nazori-kun",
+    "predeploy": "npm run release:preflight && npm run build",
     "deploy": "node scripts/deploy-pages.mjs"
   }
 }
