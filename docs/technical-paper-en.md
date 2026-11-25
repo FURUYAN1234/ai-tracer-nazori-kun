@@ -1,0 +1,35 @@
+# AI Tracer Nazori-kun v0.1.0 Technical Report
+
+November 25, 2026 · FURU
+
+## Abstract
+
+Nazori-kun reads a raster illustration as an underdrawing and replays inking and coloring in a browser. The result can be exported as a composite image, closed paths, or separate editable color layers. The browser processes the source locally and requires no API key.
+
+## Method
+
+1. **Ink detection.** For monochrome sources, the detector uses luminance over white. For color sources, it combines darkness, chroma, and contrast on either side of a candidate line. This helps separate thin dark lines from broad dark fills.
+2. **Ink reconstruction.** The program follows closed perimeters, including holes. Scanline intersections reconstruct the ink mask. A G-pen preset varies ink strength near exposed tips and thicker segments according to local ink coverage. Fine pen, brush pen, and an unstyled outline are also available.
+3. **Timing and cursor.** The simulated pen follows the perimeter. Ink appears near the cursor as it passes and progresses toward the interior of broader shapes. The program builds a traversal from the visible raster geometry. The creator's historical pen path is unknown.
+4. **Coloring.** For colored sources, representative colors and ink boundaries determine editable regions. The virtual brush reveals color in passes restricted to a color mask. Optional suggestions for monochrome input use nearest-neighbor classification of region geometry such as position, size, and aspect ratio. Users can revise the resulting color assignments.
+
+## Exports and integration
+
+PNG provides a composite. PSD contains transparent ink, separate layers for assigned colors, and paper. SVG stores editable pen perimeters and color shapes. Coordinate JSON uses source pixels with a top-left origin. WebM records the replay. Project JSON retains originals, pen settings, color assignments, boundary edits, and speed settings.
+
+The local MCP server uses standard input and output. It accepts PNGs from a designated workspace and writes PNG, PSD, SVG, and coordinate JSON to a new directory under that workspace.
+
+## Verification and limitations
+
+The Chromium app was exercised at G-pen strength 100 with a detailed fine-line clock restorer and a full-color kite maker. A live transition from inking to coloring was checked on two color examples. An independent PSD reader found one pen layer, 34 color layers, and a paper layer in the detailed export. The app was exercised for single-color edits, undo and redo, and saving and reopening a detailed project.
+
+Photographs and continuous gradients are approximated. Low-contrast boundaries and overlapping dark colors may need adjustment. Optional color suggestions provide a starting palette.
+
+## References
+
+A public demonstration on X and a separate public repository were concept references. The internal implementation of the X demonstration remains unverified. The program, UI, and examples in this application were developed for Nazori-kun.
+
+- [Public demonstration](https://x.com/masamune_sakaki/status/2125131744991199307)
+- [line-trace-strokes](https://github.com/nekomimianko/line-trace-strokes)
+- [Adobe Photoshop File Formats Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/)
+- [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)

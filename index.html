@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIトレーサー なぞり君</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="engine.js"></script>
+  <script defer src="psd.js"></script>
+  <script defer src="monoline.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>AIトレーサー なぞり君</strong><span class="version">v{{VERSION}}</span></div>
+    <div class="toolbar">
+      <button id="open-project" type="button">プロジェクトを開く</button>
+      <button id="save-project" type="button" aria-describedby="project-saves">プロジェクトを保存</button>
+      <button id="import" class="ink-button" type="button">＋ 原稿を追加</button>
+      <input id="images" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+      <input id="replacement" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      <input id="project" type="file" accept=".json,application/json" hidden>
+      <small id="project-saves">原稿・配色・ペン設定を保存して、続きから開けます。</small>
+    </div>
+  </header>
+  <main>
+    <section class="stage" aria-label="原稿と配色">
+      <div class="headline">
+        <div><p class="project-label" id="project-name"></p><h1>輪郭と配色の作業台</h1></div>
+        <button class="play-button" id="play" type="button">▶ 工程を再生</button>
+      </div>
+      <div class="stage-tools">
+        <div class="switch" role="group" aria-label="画面表示">
+          <button data-view="compare" aria-pressed="true">配色比較</button>
+          <button data-view="ink" aria-pressed="false">再構築した線</button>
+          <button data-view="works" aria-pressed="false">作業一覧</button>
+        </div>
+        <div class="undo-tools"><button id="undo" disabled>↶ 元に戻す</button><button id="redo" disabled>↷ やり直す</button><button id="reset-demo">作例に戻る</button></div>
+        <button id="jump-export" type="button">書き出しへ</button>
+      </div>
+      <div class="trace-row"><button id="trace" class="ink-button" type="button">トレスする</button><button id="replace" type="button" title="現在のペン設定で、新しい原稿をトレスできます">同じ設定で原稿を差し替え</button><label><input id="auto-color" type="checkbox"> モノクロ原稿をAIで仮配色</label><label class="speed-control">描画速度<input id="draw-speed" type="range" min="25" max="250" step="5" value="100"><output id="draw-speed-value">1倍</output></label><small id="source-kind"></small></div>
+      <div id="replay" class="replay" hidden>
+        <canvas id="movie" aria-label="線の再構築と彩色の再生"></canvas>
+        <div class="timeline">
+          <button id="replay-toggle" type="button">一時停止</button>
+          <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="再生位置">
+          <span id="phase" aria-live="off"></span>
+          <label class="speed-control">再生速度<input id="speed" type="range" min="25" max="250" step="5" value="100"><output id="speed-value">1倍</output></label>
+          <button id="save-video" type="button">動画を保存</button>
+          <button id="replay-close" type="button">閉じる</button>
+        </div>
+      </div>
+      <div id="view" class="views"></div>
+      <div id="panel-strip" class="panel-strip" aria-label="コマ切り替え"></div>
+    </section>
+    <aside class="inspector" aria-label="彩色と書き出し">
+      <div class="inspector-head"><div><p class="micro">PALETTE</p><h2>色指定</h2></div><button id="add-role" type="button" aria-label="色グループを追加">＋</button></div>
+      <div class="pen-setting"><label for="pen">ペンタッチ</label><select id="pen"><option value="g">Gペン</option><option value="fine">丸ペン</option><option value="brush">筆ペン</option><option value="original">輪郭そのまま</option></select></div>
+      <label class="pen-strength" for="strength">Gペンの強さ <output id="strength-value"></output><input type="range" id="strength" min="0" max="100" value="100"></label>
+      <div class="tools" role="group" aria-label="編集ツール">
+        <button data-tool="paint" aria-pressed="true">塗る</button>
+        <button data-tool="pick" aria-pressed="false">色を選ぶ</button>
+        <button data-tool="split" aria-pressed="false">境界を引く</button>
+        <button data-tool="erase" aria-pressed="false">色を外す</button>
+      </div>
+      <div class="roles-label"><span>色レイヤー</span><span>配色 A</span><span>配色 B</span><span>表示</span></div>
+      <div id="roles" class="roles"></div>
+      <div class="quick-row"><span>すぐ変更</span><button id="quick-a" aria-pressed="true" type="button">A</button><button id="quick-b" aria-pressed="false" type="button">B</button></div>
+      <div id="quick-colors" class="quick-colors" role="group" aria-label="選んだ色グループをワンクリックで変更"></div>
+      <form id="role-form" hidden><label for="role-name">グループ名</label><div><input id="role-name" required maxlength="24" autocomplete="off"><button type="submit">追加</button></div></form>
+      <label class="highlight"><input id="highlight" type="checkbox"> 選んだ色の範囲を強調</label>
+      <p class="hint" id="hint"></p>
+      <details class="settings">
+        <summary>線の読み取り</summary>
+        <label for="threshold">濃さのしきい値 <output id="threshold-value"></output></label>
+        <input type="range" id="threshold" min="32" max="248" value="180">
+        <p>数値を上げると、淡い線も輪郭として拾います。</p>
+      </details>
+      <div class="export" aria-labelledby="export-heading">
+        <h3 id="export-heading" tabindex="-1">画像を書き出す</h3>
+        <p id="export-target"></p>
+        <label for="export-type">PNGの内容</label>
+        <div><select id="export-type"><option value="a">配色 A</option><option value="b">配色 B</option><option value="ink">再構築した線画</option><option value="source">元絵</option></select><button id="export" class="ink-button" type="button">PNGを保存</button></div>
+        <div class="export-more"><button id="psd" type="button">PSD・全レイヤー</button><button id="svg" type="button">SVG・ベクター</button><button id="coordinates" type="button">座標 JSON</button></div>
+      </div>
+    </aside>
+  </main>
+  <footer><span>画像処理はこのブラウザー内で実行</span><span id="status" role="status" aria-live="polite"></span></footer>
+</body>
+</html>

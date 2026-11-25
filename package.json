@@ -1,0 +1,14 @@
+{
+  "name": "ai-tracer-nazori-kun",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AIトレーサー なぞり君 | Local perimeter-based inking and palette replay",
+  "license": "MIT",
+  "engines": { "node": ">=22.15" },
+  "scripts": {
+    "test": "node --test engine.test.cjs tests/public-build.test.mjs",
+    "build": "node scripts/build-public.mjs",
+    "postbuild": "node scripts/web-security.mjs --verify-dist",
+    "deploy": "node scripts/deploy-pages.mjs"
+  }
+}

@@ -1,0 +1,154 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { segment, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, stylizeInk, inspectRaster, sampleColors, makeLayers } = require('./engine.js');
+
+function drawing(rows) {
+  return { width: rows[0].length, height: rows.length,
+    ink: Uint8Array.from(rows.join(''), pixel => pixel === '#' ? 0 : 255) };
+}
+
+test('a local barrier closes an open region without drawing a visible line', () => {
+  const img = drawing(['.......', '.#####.', '.#...#.', '.....#.', '.#...#.', '.#####.', '.......']);
+  const open = segment(img, 180);
+  const closed = segment(img, 180, [[1, 2, 1, 4]]);
+  assert.equal(open.labels[0], open.labels[23]);
+  assert.notEqual(closed.labels[0], closed.labels[23]);
+  const colors = resolveColors(closed, [{ x: 3, y: 3, role: 'coat' }]);
+  const out = paint(img, closed, colors, { coat: '#ce6853' });
+  assert.deepEqual([...out.slice(4 * 24, 4 * 24 + 4)], [206, 104, 83, 255]);
+  assert.equal(out[4 * 22 + 1], 255);
+});
+
+test('inking and region IDs stay stable while shared colors change across differently shaped panels', () => {
+  for (const rows of [['.......', '.#####.', '.#...#.', '.#...#.', '.#####.', '.......'],
+    ['.......', '...###.', '..#..#.', '..#..#.', '..####.', '.......']]) {
+    const img = drawing(rows);
+    const layout = segment(img, 180);
+    const roles = resolveColors(layout, [{ x: 4, y: 2, role: 'jacket' }]);
+    const a = paint(img, layout, roles, { jacket: '#e44228' });
+    const b = paint(img, layout, roles, { jacket: '#254be4' });
+    assert.deepEqual([...a.slice(4 * 18, 4 * 18 + 3)], [228, 66, 40]);
+    assert.deepEqual([...b.slice(4 * 18, 4 * 18 + 3)], [37, 75, 228]);
+    assert.equal(a[4 * 19], 0);
+    assert.equal(b[4 * 19], 0);
+    assert.equal(b[0], 255);
+  }
+});
+
+test('old color markers update by position after splitting, with protected white as an explicit role', () => {
+  const img = drawing(['........', '.######.', '.#....#.', '.#....#.', '.######.', '........']);
+  const layout = segment(img, 180, [[4, 1, 4, 4]]);
+  const markers = [{ x: 3, y: 2, role: 'coat' }, { x: 5, y: 2, role: 'white' }];
+  const roles = resolveColors(layout, markers);
+  assert.equal(roles.get(layout.labels[19]), 'coat');
+  assert.equal(roles.get(layout.labels[21]), 'white');
+  assert.equal(roles.size, 2);
+});
+
+test('an apparent narrow hole remains a selectable region and a blank sheet stays usable', () => {
+  const img = drawing(['.....', '.###.', '.#.#.', '.###.', '.....']);
+  assert.equal(segment(img, 180).regions.length, 2);
+  const blank = drawing(['.....']);
+  const layer = segment(blank, 180);
+  assert.equal(layer.regions.length, 1);
+  assert.equal(resolveColors(layer, [{ x: -1, y: 0, role: 'bad' }]).size, 0);
+});
+
+test('ink tracing preserves a hole and two diagonal ink shapes as independent closed boundaries', () => {
+  const img = drawing(['.....', '.###.', '.#.#.', '.###.', '....#']);
+  const traced = traceInk(img, 180);
+  assert.equal(traced.length, 3);
+  const areas = traced.map(({ points }) => points.reduce((sum, [x, y], index) => {
+    const [nx, ny] = points[(index + 1) % points.length];
+    return sum + (x * ny - nx * y) / 2;
+  }, 0));
+  assert.deepEqual(areas.sort((a, b) => a - b), [-1, 1, 9]);
+  assert.equal(traced.reduce((sum, shape) => sum + shape.length, 0), 20);
+  assert.deepEqual(rebuildInk(img, 180).rebuilt.ink, img.ink);
+});
+
+test('G-pen fades an exposed tip while leaving the thicker black core intact', () => {
+  const img = drawing(['.........', '...###...', '...###...', '.######..', '...###...', '...###...', '.........']);
+  const g = stylizeInk(img, 'g').ink;
+  const fine = stylizeInk(img, 'fine').ink;
+  const brush = stylizeInk(img, 'brush').ink;
+  assert.ok(g[28] > g[31] + 30);
+  assert.equal(g[31], 0);
+  assert.equal(fine[20], 255);
+  assert.ok(g[20] < fine[20]);
+  assert.ok(brush[20] < g[20]);
+  assert.equal(g[28 + 1] > g[31], true);
+  assert.deepEqual(stylizeInk(img, 'original').ink, img.ink);
+  assert.deepEqual(stylizeInk(img, 'g', 0).ink, img.ink);
+  assert.ok(stylizeInk(img, 'g', .5).ink[28] < g[28]);
+});
+
+test('a dark saturated color is retained as fill and neutral black separates it from the background', () => {
+  const rows = ['.......', '.#####.', '.#CCC#.', '.#CCC#.', '.#CCC#.', '.#####.', '.......'];
+  const rgba = new Uint8ClampedArray(rows.join('').split('').flatMap(c =>
+    c === 'C' ? [45, 35, 102, 255] : c === '#' ? [18, 18, 18, 255] : [255, 255, 255, 255]));
+  const input = inspectRaster(rgba, 7, 7);
+  assert.equal(input.isColor, true);
+  const source = sampleColors(segment(input, 180), input.rgba);
+  assert.deepEqual(source.map(region => region.hex).sort(), ['#2d2366', '#ffffff']);
+  const bw = new Uint8ClampedArray(7 * 7 * 4).fill(255);
+  assert.equal(inspectRaster(bw, 7, 7).isColor, false);
+});
+
+test('the ink comes in along the actual contour over time and reaches wide interiors', () => {
+  const input = drawing(['.........', '.###..##.', '.###..##.', '.###.....', '.........']);
+  const { contours, rebuilt } = rebuildInk(input, 180);
+  const total = contours.reduce((sum, path) => sum + traceWeight(path.length), 0);
+  const time = inkTimeline(rebuilt, contours, total);
+  assert.equal(time[10], 0);
+  assert.ok(time[20] > 0 && time[20] < .75);
+  assert.ok(time[15] > .35 && time[15] < 1);
+  assert.equal(time[0], Infinity);
+});
+
+test('a flat color boundary remains separated without being painted as black ink', () => {
+  const rgba = new Uint8ClampedArray(12 * 12 * 4);
+  for (let i = 0; i < 144; i++) {
+    const x = i % 12, y = Math.floor(i / 12);
+    rgba.set(x >= 4 && x < 8 && y >= 4 && y < 8 ? [246, 94, 65, 255] : [212, 178, 251, 255], i * 4);
+  }
+  const input = inspectRaster(rgba, 12, 12);
+  assert.equal(traceInk(input, 180).length, 0);
+  assert.deepEqual(sampleColors(segment(input, 180), rgba).map(item => item.hex).sort(), ['#d4b2fb', '#f65e41']);
+});
+
+test('independent color layers and transparent pen recompose the displayed image', () => {
+  const img = drawing(['.......', '.#####.', '.#.#.#.', '.#####.', '.......']);
+  const layout = segment(img, 180);
+  const markers = [{ x: 2, y: 2, role: 'a' }, { x: 4, y: 2, role: 'b' }];
+  const assignments = resolveColors(layout, markers);
+  const roles = [{ id: 'a', hex: '#d65242', name: 'Rose' }, { id: 'b', hex: '#4f61c9', name: 'Blue' }];
+  const layers = makeLayers(img, layout, assignments, roles);
+  assert.deepEqual(layers.map(layer => layer.label), ['ペン', 'Rose', 'Blue', '用紙']);
+  assert.equal(layers[0].pixels[4 * 16 + 3], 0);
+  const composite = new Uint8ClampedArray(4 * img.ink.length);
+  for (const layer of [...layers].reverse()) {
+    for (let y = 0; y < layer.height; y++) for (let x = 0; x < layer.width; x++) {
+      const from = (y * layer.width + x) * 4;
+      const to = ((y + layer.top) * img.width + x + layer.left) * 4;
+      const alpha = layer.pixels[from + 3] / 255;
+      for (let c = 0; c < 3; c++) composite[to + c] = layer.pixels[from + c] * alpha + composite[to + c] * (1 - alpha);
+      composite[to + 3] = 255;
+    }
+  }
+  assert.deepEqual(composite, paint(img, layout, assignments, Object.fromEntries(roles.map(role => [role.id, role.hex]))));
+});
+
+test('source palette assigns a class to disjoint regions and stores a local edit only for the selected region', () => {
+  const img = drawing(['.....', '..#..', '.....']);
+  img.ink = Uint8Array.from('..#....#....#..', cell => cell === '#' ? 0 : 255);
+  img.colorClasses = new Uint8Array(img.ink.length).fill(0);
+  const layout = segment(img, 180);
+  const left = layout.labels[0], right = layout.labels[4];
+  assert.notEqual(left, right);
+  const shared = resolveColors(layout, [], ['color']);
+  assert.deepEqual([...shared.values()], ['color', 'color']);
+  const erased = resolveColors(layout, [{ x: 0, y: 0, role: null }], ['color']);
+  assert.equal(erased.get(left), undefined);
+  assert.equal(erased.get(right), 'color');
+});
