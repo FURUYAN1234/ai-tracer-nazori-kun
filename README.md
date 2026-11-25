@@ -22,19 +22,23 @@ python -m http.server 8756 --bind 127.0.0.1 --directory dist
 Four sample originals are included in `examples/`: a monochrome and color courier, a detailed clock restorer in fine line, and a detailed kite maker in color. / `examples/` にモノクロとカラーの配達員、細線で描いた詳細な時計職人、詳細カラーの凧職人の原稿を収録しています。
 
 1. Open a sample underdrawing or add a PNG, JPEG, or WebP file. / 作例の下絵を選ぶか、PNG・JPEG・WebPを追加します。
-2. Click **トレスする**. A pen progressively draws over the faded source. A color original then recovers its colors with a moving brush. For a monochrome original, **モノクロ原稿をAIで仮配色** optionally enables an initial palette. / **トレスする**を押すと、薄くなった原稿の上でペンが線を残します。カラー原稿は続いて筆が動き、原稿の色で塗ります。モノクロ原稿に色を入れる場合は**モノクロ原稿をAIで仮配色**を選びます。
+2. Click **トレスする**. A pen draws over the faded original. For a color original, the brush then applies colors sampled from the image. / **トレスする**を押すと、薄く表示した原稿の上にペンで線を引きます。カラー原稿ではその後、元絵から拾った色を筆で塗ります。
 3. Use the seek bar, pause, or rewind. Drawing speed applies to the preview and video capture. Playback speed adjusts only how fast the preview runs. Choose G pen, fine pen, brush pen, or the reconstructed outline. G pen strength ranges from 0 to 100. / シーク、一時停止、巻き戻しを使えます。描画速度はプレビューと動画保存に、再生速度はプレビューの見え方だけに反映します。Gペン・丸ペン・筆ペン・輪郭そのままを選べます。Gペンの強さは0〜100です。
 4. Select a layer by its name or pick its color from the drawing. Use a quick swatch or the color picker, hide the layer, or undo/redo. One color group can be shared between panels. / レイヤー名を選ぶか、**色を選ぶ**で絵の中の色を拾います。色見本やカラーピッカーで変更し、表示・非表示や取り消し・やり直しができます。同じ色グループを複数コマで共有できます。
 5. **作業一覧** shows thumbnail cards. Opening a card changes the active image, whose name appears under **画像を書き出す**. / **作業一覧**はサムネイル表示です。画像を選ぶと**画像を書き出す**の欄に対象の名前が表示されます。
 6. **同じ設定で原稿を差し替え** opens a different original with the same pen, strength, threshold, and speed. / **同じ設定で原稿を差し替え**から別の画像を開くと、ペン、強さ、読み取りのしきい値、速度を引き継げます。
 
+For a monochrome original, check **モノクロ原稿をAIで仮配色** next to **トレスする** before starting. After inking, the brush applies suggested colors. The browser chooses them based on the size, position, and shape of each region. You can change the colors in the palette. No API key is required. / 白黒原稿に色を付けるには、**トレスする**の隣にある**モノクロ原稿をAIで仮配色**にチェックを入れてから実行します。ペン入れの後、筆で仮の色を塗る様子まで再生します。色候補は領域の大きさ・位置・形を手がかりにブラウザー内で決まり、あとからパレットで変更できます。APIキーは不要です。
+
 ## Exports / 書き出し
 
 - PNG with the source, pen, or palette A/B. / 元絵・ペン・配色A/BをPNGで保存します。
-- PSD with a transparent pen layer, one layer per assigned color, and paper. A layer hidden in the app stays present and hidden in the PSD. / 透過のペン層、割り当てた色ごとの層、用紙を一つのPSDに格納します。非表示の色もPSDに非表示のまま残ります。
-- SVG with editable pen and color shapes, and JSON coordinates in source pixels, with the top-left as origin. / ペンと色面を別のパスに持つSVG、ペンの輪郭を持つ座標JSONで保存します。座標は左上原点、単位は原稿のピクセルです。
+- **PSD・全レイヤー** saves transparent ink, one layer per assigned color, and paper. Choose PSD to edit ink or colors layer by layer in a PSD-compatible drawing app. Hidden layers stay hidden in the file. / ペン、色ごとのレイヤー、用紙を一つのPSDに保存します。作画ソフトで線や色をレイヤーごとに直したいときに使います。非表示の色レイヤーも非表示のまま保存します。
+- **SVG・ベクター** saves ink outlines and color shapes as vector paths. Choose SVG to enlarge the artwork without pixelation or edit the paths in a vector editor. / ペンの輪郭と色面をベクターパスとして保存します。ぼやけずに拡大したいときや、ベクター編集ソフトで輪郭や色面の形を直したいときに使います。
+- **座標 JSON** exports ink outlines, the order of the replay contours, and color assignment data in the `nazori-coordinates/1` format. Coordinates use pixels with the top-left corner as the origin. Use this file as input to a custom replay tool or conversion script. / ペンの輪郭、再生する輪郭の順番、色の割り当て情報が入ります。`nazori-coordinates/1` は左上を原点とするピクセル座標の形式です。自作の再生ツールや変換スクリプトに描画データを渡すときに使います。
 - WebM timeline capture where browser encoders support it. / 対応ブラウザーでは工程をWebMで保存します。
-- Editable project JSON with images, edits, color variants, boundary cuts, pen and speed settings, and the selected image. / プロジェクトJSONには原稿・編集結果・配色・塗り分け境界・ペンと速度の設定・選択中の画像が入ります。
+
+**プロジェクトを保存** saves the source images, palettes, region boundaries, pen and speed settings, and selected image as a project JSON. Use **プロジェクトを開く** with that file to resume editing. / **プロジェクトを保存**で原稿・配色・塗り分け境界・ペンと速度の設定・選択中の画像をプロジェクトJSONに保存します。作業を再開するときは、**プロジェクトを開く**でそのファイルを選びます。
 
 ## Design and provenance / 設計と来歴
 
