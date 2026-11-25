@@ -5,6 +5,7 @@ const readline = require('node:readline');
 const E = require('./engine.js');
 const PNG = require('./png.cjs');
 const PSD = require('./psd.js');
+const { version } = require('./package.json');
 
 if (process.argv[2] !== '--workspace' || !process.argv[3]) {
   process.stderr.write('Usage: node mcp.cjs --workspace <input/output directory>\n');
@@ -100,7 +101,7 @@ input.on('line', line => {
   if (method === 'initialize' && phase === 'new') {
     phase = 'initializing';
     const protocolVersion = versions.has(params?.protocolVersion) ? params.protocolVersion : '2025-11-25';
-    return send({ id, result: { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'nazori-kun', version: '0.1.0' } } });
+    return send({ id, result: { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'nazori-kun', version } } });
   }
   if (method === 'ping') return send({ id, result: {} });
   if (phase !== 'ready') return send({ id, error: { code: -32002, message: 'Initialize the MCP session first.' } });

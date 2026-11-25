@@ -84,7 +84,8 @@
 
     const records = [];
     const imageData = [];
-    for (const layer of stack) {
+    // Photoshop reads PSD layers from bottom to top. The editor stack is top to bottom.
+    for (const layer of [...stack].reverse()) {
       const channels = [3, 0, 1, 2].map(channel => packedChannel(layer, channel));
       records.push(...record(layer, channels));
       imageData.push(...channels.map(channel => channel.data));

@@ -1,4 +1,4 @@
-# AI Tracer Nazori-kun v0.1.0 Technical Report
+# AI Tracer Nazori-kun v0.1.1 Technical Report
 
 November 25, 2026 · FURU
 
@@ -13,7 +13,7 @@ AI assisted with implementation. The main tracing and original-color recovery us
 1. **Ink detection.** For monochrome sources, the detector uses luminance over white. For color sources, it combines darkness, chroma, and contrast on either side of a candidate line. This helps separate thin dark lines from broad dark fills.
 2. **Ink reconstruction.** The program follows closed perimeters, including holes. Scanline intersections reconstruct the ink mask. A G-pen preset varies ink strength near exposed tips and thicker segments according to local ink coverage. Fine pen, brush pen, and an unstyled outline are also available.
 3. **Timing and cursor.** The simulated pen follows the perimeter. Ink appears near the cursor as it passes and progresses toward the interior of broader shapes. The program builds a traversal from the visible raster geometry. The creator's historical pen path is unknown.
-4. **Coloring.** For colored sources, representative colors and ink boundaries determine editable regions. The virtual brush reveals color in passes restricted to a color mask. Optional suggestions for monochrome input use nearest-neighbor classification of region geometry such as position, size, and aspect ratio. Users can revise the resulting color assignments.
+4. **Coloring.** For colored sources, representative colors and ink boundaries determine the color regions. The virtual brush reveals color in passes restricted to a color mask. Tracing monochrome input produces line art. A color original receives its own color layers, which can be adjusted individually.
 
 ## Exports and integration
 
@@ -23,9 +23,9 @@ The local MCP server uses standard input and output. It accepts PNGs from a desi
 
 ## Verification and limitations
 
-The Chromium app was exercised at G-pen strength 100 with a detailed fine-line clock restorer and a full-color kite maker. A live transition from inking to coloring was checked on two color examples. An independent PSD reader found one pen layer, 34 color layers, and a paper layer in the detailed export. The app was exercised for single-color edits, undo and redo, and saving and reopening a detailed project.
+The Chromium app was exercised at G-pen strength 100 with a detailed fine-line clock restorer and a full-color kite maker. The kite maker opens by default; the clock restorer is second in the image list. A live transition from inking to coloring was checked on two color examples. Color and monochrome PSDs displayed correctly in Photoshop 2026 with paper beneath the artwork. The tested color PSD contained one pen layer, 34 color layers, and one paper layer. The app was exercised for single-color edits, undo and redo, and saving and reopening a detailed project.
 
-Photographs and continuous gradients are approximated. Low-contrast boundaries and overlapping dark colors may need adjustment. Optional color suggestions provide a starting palette.
+Photographs and continuous gradients are approximated. Low-contrast boundaries and overlapping dark colors may need adjustment.
 
 ## References
 

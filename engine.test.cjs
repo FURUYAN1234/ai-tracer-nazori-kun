@@ -45,6 +45,22 @@ test('old color markers update by position after splitting, with protected white
   assert.equal(roles.size, 2);
 });
 
+test('highlighting marks edges of the selected regions without washing out other colors', () => {
+  const img = drawing(['........', '........', '........']);
+  const layout = { labels: Int32Array.from([1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2]),
+    regions: [{ id: 1 }, { id: 2 }] };
+  const roles = new Map([[1, 'selected'], [2, 'other']]);
+  const palette = { selected: '#3a8d45', other: '#264bba' };
+  const original = paint(img, layout, roles, palette);
+  const highlighted = paint(img, layout, roles, palette, { highlight: 'selected' });
+  const pixel = (data, index) => [...data.slice(index * 4, index * 4 + 4)];
+  assert.deepEqual(pixel(highlighted, 11), [185, 32, 125, 255]);
+  assert.deepEqual(pixel(highlighted, 10), pixel(original, 10));
+  for (const index of [4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23]) {
+    assert.deepEqual(pixel(highlighted, index), pixel(original, index));
+  }
+});
+
 test('an apparent narrow hole remains a selectable region and a blank sheet stays usable', () => {
   const img = drawing(['.....', '.###.', '.#.#.', '.###.', '.....']);
   assert.equal(segment(img, 180).regions.length, 2);
@@ -137,6 +153,33 @@ test('independent color layers and transparent pen recompose the displayed image
     }
   }
   assert.deepEqual(composite, paint(img, layout, assignments, Object.fromEntries(roles.map(role => [role.id, role.hex]))));
+});
+
+test('PSD stores layer records and their channel payloads bottom to top', () => {
+  const encode = require('./psd.js');
+  const frame = { width: 1, height: 1 };
+  const layer = (name, red) => ({ ...frame, name, label: name, top: 0, left: 0,
+    pixels: Uint8Array.of(red, 0, 0, 255) });
+  const stack = [layer('Pen', 11), layer('Color', 77), layer('Paper', 255)];
+  const psd = Buffer.concat(encode(frame, stack, stack[0].pixels));
+  const count = psd.readInt16BE(42);
+  const records = [];
+  let offset = 44;
+  for (let index = 0; index < count; index++) {
+    const channels = psd.readUInt16BE(offset + 16);
+    const lengths = Array.from({ length: channels }, (_, i) => psd.readUInt32BE(offset + 20 + 6 * i));
+    const extra = offset + 18 + 6 * channels + 12;
+    const name = extra + 12;
+    records.push({ name: psd.toString('ascii', name + 1, name + 1 + psd[name]), lengths });
+    offset = extra + 4 + psd.readUInt32BE(extra);
+  }
+  const layers = records.map(({ name, lengths }) => {
+    const red = psd[offset + lengths[0] + 5];
+    offset += lengths.reduce((sum, length) => sum + length, 0);
+    return [name, red];
+  });
+  assert.deepEqual(layers, [['Paper', 255], ['Color', 77], ['Pen', 11]]);
+  assert.deepEqual(stack.map(({ name }) => name), ['Pen', 'Color', 'Paper']);
 });
 
 test('source palette assigns a class to disjoint regions and stores a local edit only for the selected region', () => {
