@@ -13,8 +13,8 @@
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--body); }
 button, input, select { font: inherit; }
-button, select { border: 1px solid var(--line); border-radius: 7px; background: var(--sheet); color: var(--ink); cursor: pointer; padding: .58em .85em; font-weight: 650; }
-button:hover:not(:disabled), select:hover { border-color: var(--accent); }
+button, select, .manual-link { border: 1px solid var(--line); border-radius: 7px; background: var(--sheet); color: var(--ink); cursor: pointer; padding: .58em .85em; font-weight: 650; }
+button:hover:not(:disabled), select:hover, .manual-link:hover { border-color: var(--accent); }
 button:disabled { opacity: .48; cursor: default; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 input[type='range'], input[type='checkbox'] { accent-color: var(--accent); }
@@ -29,6 +29,8 @@ input[type='range'], input[type='checkbox'] { accent-color: var(--accent); }
 .version { font: 10px/1.5 'Cascadia Mono', monospace; letter-spacing: .09em; color: var(--muted); }
 .toolbar, .undo-tools { display: flex; gap: 7px; flex-wrap: wrap; }
 .toolbar { justify-content: flex-end; min-width: 0; }
+.manual-link { display: inline-flex; align-items: center; gap: .45em; white-space: nowrap; text-decoration: none; }
+.manual-link span { color: var(--muted); font-size: .77em; letter-spacing: .04em; }
 .toolbar #project-saves { align-self: center; color: var(--muted); font-size: 11px; }
 .ink-button, .play-button { background: var(--ink); color: white; border-color: var(--ink); }
 .play-button { padding: .8em 1.23em; border-radius: 30px; white-space: nowrap; background: var(--accent); border-color: var(--accent); }
