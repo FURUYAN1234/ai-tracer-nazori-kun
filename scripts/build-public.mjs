@@ -1,12 +1,13 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { secureHtml, verifyBuiltSecurity } from './web-security.mjs';
 
 export const project = fileURLToPath(new URL('../', import.meta.url));
 export const publicFiles = [
   'app.js', 'engine.js', 'psd.js', 'style.css', 'LICENSE',
+  'downloads/nazori-kun-manual.pdf',
   'examples/mono.png', 'examples/color.png',
   'examples/detailed-mono.png', 'examples/detailed-color.png',
 ];
@@ -20,7 +21,8 @@ export async function buildPublic(output = join(project, 'dist')) {
     .replace('src="psd.js"', `src="psd.js?v=${psdVersion}"`))
     .replace(/connect-src [^;]+/, "connect-src 'none'");
   verifyBuiltSecurity(html);
-  await mkdir(join(output, 'examples'), { recursive: true });
+  const directories = new Set(publicFiles.map(dirname));
+  await Promise.all([...directories].map(directory => mkdir(join(output, directory), { recursive: true })));
   await rm(join(output, 'monoline.js'), { force: true });
   await Promise.all([
     writeFile(join(output, 'index.html'), html),

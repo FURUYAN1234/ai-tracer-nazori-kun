@@ -12,7 +12,8 @@ test('the public build is versioned, cannot request remote data, and contains on
   try {
     await writeFile(join(output, 'monoline.js'), 'obsolete automatic color asset');
     const html = await buildPublic(output);
-    assert.match(html, /v0\.1\.1/);
+    const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+    assert.ok(html.includes('v' + version));
     assert.match(html, /connect-src 'none'/);
     assert.match(html, /<script defer src="app\.js"><\/script>/);
     const psdVersion = createHash('sha256').update(await readFile(join(output, 'psd.js'))).digest('hex').slice(0, 12);
@@ -35,8 +36,11 @@ test('the public build is versioned, cannot request remote data, and contains on
     assert.match(html, /id="image-screen"[^>]*>画像一覧<\/button>/);
     assert.match(html, /id="export"[^>]*>保存<\/button>/);
     assert.deepEqual((await readdir(output)).sort(), [
-      '.nojekyll', 'LICENSE', 'app.js', 'engine.js', 'examples', 'index.html', 'psd.js', 'style.css',
+      '.nojekyll', 'LICENSE', 'app.js', 'downloads', 'engine.js', 'examples', 'index.html', 'psd.js', 'style.css',
     ]);
+    assert.match(html, /href="downloads\/nazori-kun-manual\.pdf"[^>]*>操作マニュアル/);
+    const manual = await readFile(join(output, 'downloads', 'nazori-kun-manual.pdf'));
+    assert.equal(manual.subarray(0, 5).toString(), '%PDF-');
     const image = await readFile(join(output, 'examples', 'detailed-color.png'));
     assert.equal(image.subarray(1, 4).toString(), 'PNG');
   } finally {

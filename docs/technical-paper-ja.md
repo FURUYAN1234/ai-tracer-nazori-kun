@@ -1,4 +1,4 @@
-# AIトレーサー なぞり君 v0.1.1 技術報告
+# AIトレーサー なぞり君 v0.1.2 技術報告
 
 2026年11月25日 · FURU
 
@@ -35,3 +35,5 @@ Xで公開された実演と、別の公開リポジトリを着想の参考と�
 - [line-trace-strokes](https://github.com/nekomimianko/line-trace-strokes)
 - [Adobe Photoshop File Formats Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/)
 - [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
+v0.1.2は操作案内の更新で、トレス・彩色・保存の処理方式はv0.1.1と同じ。アプリのヘッダーから操作・API設定のPDFを開ける。

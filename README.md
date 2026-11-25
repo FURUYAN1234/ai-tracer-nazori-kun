@@ -1,48 +1,52 @@
-# AIトレーサー なぞり君
+# AI Tracer Nazori-kun / AIトレーサー なぞり君
 
-A local drawing simulator that traces an underdrawing, replays the pen and brush, and exports individually editable colors. / 下絵をトレスするペンと塗り筆の動きをその場で見せ、仕上がりを色別のレイヤーで保存するローカルアプリです。
+[![Open the web app / Webアプリを開く](docs/assets/button-open.png)](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
+[![Download the manual PDF / 操作マニュアルPDFをダウンロード](docs/assets/button-manual.png)](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases/latest/download/nazori-kun-manual.pdf)
 
-AI assisted with writing the software. The main tracing and original-color recovery run as image-processing algorithms in the browser. / コーディングにはAIを使いました。トレスと元色の復元を行うのは、ブラウザー内で動く画像処理アルゴリズムです。
+[Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
 
-## Run / 起動
+Watch a pen retrace the lines in an illustration. On a color original, a brush then applies colors sampled from the same image. When the drawing ends, the workspace puts the original beside the reconstructed result. / イラストを読み込み、ペン先が元絵をなぞって線を引き直すところを見られます。カラー原稿ではその後、筆が元絵から拾った色を塗ります。工程が終わると、作業画面に元絵とトレス結果が並びます。
 
-Use the public app or build the static files and serve the `dist` folder locally. The browser processing uses no account or API key. / 公開アプリを開くか、このフォルダーでビルドして `dist` をローカルに表示します。ブラウザー内の処理にアカウントやAPIキーは不要です。
+Tracing and reconstruction run in the browser. The drawing is processed using image analysis, and it is never sent to an AI service. No API key or AI subscription is required. / トレスと元色の復元はブラウザー内の画像処理で行います。原稿は外部サービスへ送信されず、生成AIサービスへの登録やAPIキーも不要です。
 
-[Open the app / アプリを開く](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
+![Color workspace with the original on the left and the traced result on the right / カラー作業画面、左に元絵、右にトレス結果](docs/assets/workspace-color.jpg)
 
-[Demo and guide / 実演・解説](https://note.com/happy_duck780/n/n75301de9493a) · [AI Manga Creative Suite / AIまんが制作エコシステム](https://note.com/happy_duck780/n/nbdf826604ce7)
+## Try the built-in examples / 付属作例で試す
 
-```powershell
-npm run build
-python -m http.server 8756 --bind 127.0.0.1 --directory dist
-```
+1. Open the web app and click **トレスする** (Trace) on the color kite-maker example. The cursor switches from a pen to a brush. A color result appears on the right when tracing ends. / Webアプリを開き、カラー作例「凧職人」で **トレスする** を押します。ペン先が筆先に切り替わり、最後は右に色付きの結果が並びます。
+2. From **画像一覧** (Image list), find the monochrome clock-maker, then choose **作業画面で開く**. Trace it to see how a monochrome original becomes line art. The list also includes two courier samples. / **画像一覧**で白黒の「時計職人」を探し、**作業画面で開く**を押します。白黒原稿は線画まで仕上がります。配達員の白黒・カラー作例も使えます。
+3. Choose **画像を取り込む** to work with your own PNG, JPEG or WebP files. You can select multiple files, then switch between them from the image list. / 自分の原稿を使う場合は、上部の **画像を取り込む** からPNG・JPEG・WebPを選びます。複数選択でき、読み込み後は画像一覧から作業する原稿を開けます。
 
-[http://127.0.0.1:8756/](http://127.0.0.1:8756/)
+![Original and reconstructed monochrome line art side by side / 白黒原稿の元絵と線画の比較](docs/assets/workspace-mono.jpg)
 
-Four sample originals are included in `examples/`. The app opens with the full-color kite maker. The fine-line clock restorer is next in **画像一覧**, followed by the two courier samples. / 起動時はカラーの凧職人の原稿が開きます。**画像一覧**の2枚目はモノクロの時計職人の元絵です。配達員の白黒・カラー作例も収録しています。
+## Change the pen and review the process / ペンタッチを調整し、工程を見る
 
-1. Use **画像を取り込む** in the header to open a PNG, JPEG, or WebP. To switch originals, open **画像一覧** and choose **作業画面で開く** below the image. / ヘッダーの**画像を取り込む**でPNG・JPEG・WebPを開きます。違う原稿を作業するときは、**画像一覧**で対象の**作業画面で開く**を押します。
-2. Click **トレスする**. A pen draws over the faded original. For a color original, the brush then applies colors sampled from the image. On completion, the original appears beside the traced result in color or monochrome. / **トレスする**を押すと、薄く表示した原稿の上にペンで線を引きます。カラー原稿ではその後、元絵から拾った色を筆で塗ります。終了すると、元絵とトレス後の絵が並びます。モノクロ原稿は線画、カラー原稿は色が入った結果が表示されます。
-3. Use **工程を再生** to watch the process again with seeking, pausing, and rewinding. Drawing speed applies to the preview and video capture. Playback speed adjusts only how fast the preview runs. Choose G pen, fine pen, brush pen, or the reconstructed outline. G pen strength ranges from 0 to 100. / **工程を再生**から、シーク・一時停止・巻き戻しができます。描画速度はプレビューと動画保存に、再生速度はプレビューの見え方だけに反映します。Gペン・丸ペン・筆ペン・輪郭そのままを選べます。Gペンの強さは0〜100です。
-4. Expand **色レイヤーを編集** to adjust the colors. Click a layer's A or B swatch and choose **適用** to confirm its new color. The palette shortcuts apply immediately. Changes support undo and redo. / カラー結果の色を変えるときは**色レイヤーを編集**を開きます。色レイヤーのA・Bの色見本から色を選び、**適用**で確定します。「変更先」の下の色見本はその場で反映されます。変更は取り消し・やり直しができます。
-5. **画像一覧** shows each original beside its traced result. Click a thumbnail for a larger preview. Use **作業画面** to return from the image list, preview or replay. / **画像一覧**に元絵と作業後のサムネイルが並びます。サムネイルを押すと大きく表示されます。画像一覧・プレビュー・再生からは**作業画面**で戻れます。
-6. **原稿の操作 → 同じ設定で原稿を差し替え** opens a different original with the same pen, strength, threshold, and speed. / **原稿の操作 → 同じ設定で原稿を差し替え**から別の画像を開くと、ペン、強さ、読み取りのしきい値、速度を引き継げます。
+Choose G-pen, round pen, brush pen, or the extracted outline under **ペンタッチ**. **Gペンの強さ** changes the contrast between thinner and heavier parts of a G-pen stroke. For pale monochrome lines, adjust **線の読み取り → 濃さのしきい値** and run the trace again. / **ペンタッチ** でGペン、丸ペン、筆ペン、輪郭そのままを選べます。**Gペンの強さ** で入り抜きや太さの差を調整します。白黒の淡い線を拾いたい場合は **線の読み取り → 濃さのしきい値** を調整してトレスし直します。
 
-Monochrome originals produce line art. Each newly traced color original has its own palette, with two independently editable versions of each color. / モノクロ原稿は線画を出力します。新たにトレスするカラー原稿の配色は原稿ごとに保存され、配色AとBの色を個別に変更できます。
+**描画速度** sets the speed of the initial trace. **工程を再生** plays the sequence from the beginning. Pause or seek with the timeline, and change **再生速度** independently. **動画を保存** exports the replay as WebM when the browser provides a supported encoder. / **描画速度** はトレス時の速さです。**工程を再生** で最初から見直せます。一時停止やシークバーで途中へ移動し、**再生速度** を別に調整できます。対応ブラウザーでは **動画を保存** からWebMに保存できます。
 
-## Exports / 書き出し
+![The brush moving across the color original during replay / 再生中、筆先が動きながら色を置いている場面](docs/assets/drawing-replay.jpg)
 
-Select a thumbnail in **画像一覧**, or click **保存…** above an image on the work screen. The preview shows the selected image at a larger size. Choose a file format and click **保存**. / **画像一覧**のサムネイル、または作業画面で絵の上にある**保存…**を押します。**画像プレビュー**で選んだ絵を確認し、**保存形式**を指定して**保存**を押します。
+For a color result, select a palette swatch, choose a replacement color, and click **適用**. Regions sharing that color layer change together. **配色 AとBを比べる** previews two alternatives. **元に戻す** and **やり直す** can restore changes. / カラー結果の色チップを開き、色を選んで **適用** を押すと、その色レイヤーに入っている箇所が変わります。**配色 AとBを比べる** で二つの配色を見比べることができます。色の変更は **元に戻す**・**やり直す** に対応します。
 
-Originals can be saved as PNG. Finished results support PNG, layered PSD, vector SVG, and coordinate JSON. To save only the ink of a color result as PNG or SVG, open **元絵と線画**. Choose **配色 A** or **配色 B** for a PSD with the color layers. / 元絵はPNG、作業後の絵はPNG・レイヤー付きPSD・ベクターSVG・座標JSONで保存できます。カラー原稿の線画だけをPNG・SVGにする場合は**元絵と線画**を開き、色レイヤー付きPSDは**配色 A**または**配色 B**の絵から保存します。
+## Pick an image, then a format / 画像を選び、保存形式を指定する
 
-- PNG with the source, pen, or palette A/B. / 元絵・ペン・配色A/BをPNGで保存します。
-- **PSD** saves transparent ink, one layer per assigned color, and paper. Choose PSD to edit ink or colors layer by layer in a PSD-compatible drawing app. Hidden layers stay hidden in the file. / ペン、色ごとのレイヤー、用紙を一つのPSDに保存します。作画ソフトで線や色をレイヤーごとに直したいときに使います。非表示の色レイヤーも非表示のまま保存します。
-- **SVG** saves ink outlines and color shapes as vector paths. Choose SVG to enlarge the artwork without pixelation or edit the paths in a vector editor. / ペンの輪郭と色面をベクターパスとして保存します。ぼやけずに拡大したいときや、ベクター編集ソフトで輪郭や色面の形を直したいときに使います。
-- **座標JSON** exports ink outlines, the order of the replay contours, and color assignment data in the `nazori-coordinates/1` format. Coordinates use pixels with the top-left corner as the origin. Use this file as input to a custom replay tool or conversion script. / ペンの輪郭、再生する輪郭の順番、色の割り当て情報が入ります。`nazori-coordinates/1` は左上を原点とするピクセル座標の形式です。自作の再生ツールや変換スクリプトに描画データを渡すときに使います。
-- WebM timeline capture where browser encoders support it. / 対応ブラウザーでは工程をWebMで保存します。
+Open a thumbnail from **画像一覧**, or use **保存…** above an image in the workspace. Confirm the selected image in **画像プレビュー**, choose **保存形式**, and press **保存**. To export only the line art of a color original, open **元絵と線画** and select the line art. For a PSD with color layers, select the color result or the desired palette. / **画像一覧** のサムネイルか、作業画面で絵の上にある **保存…** を押します。**画像プレビュー** で対象を確かめ、**保存形式** を選んで **保存**。カラー原稿の線画だけを保存するなら **元絵と線画** から線画を、色レイヤー付きPSDなら色付きのトレス結果や配色を選びます。
 
-**プロジェクトを保存** saves the source images, palettes, region boundaries, pen and speed settings, and selected image as a project JSON. Use **プロジェクトを開く** with that file to resume editing. / **プロジェクトを保存**で原稿・配色・塗り分け境界・ペンと速度の設定・選択中の画像をプロジェクトJSONに保存します。作業を再開するときは、**プロジェクトを開く**でそのファイルを選びます。
+![Image list with original and result thumbnails / 画像一覧で原稿と作業後の絵を選ぶ](docs/assets/image-list.jpg)
+
+| Format / 形式 | Use / 使い分け |
+| --- | --- |
+| PNG | Share the selected image, or save the original as PNG. / 選んだ絵を表示・共有したいとき。元絵の保存にも使います。 |
+| PSD | Edit ink, individual color layers, and paper in Photoshop or a compatible editor. Layer visibility is preserved. / Photoshopなどでペン線・色別レイヤー・用紙を編集したいとき。色レイヤーの表示状態も保持します。 |
+| SVG | Scale the result or edit the shapes in a vector editor. Color areas and ink outlines are saved as vector paths. / 絵を拡大したいときや、ベクター編集ソフトで色面・線の輪郭を調整したいとき。 |
+| Coordinate JSON / 座標JSON | Send outlines, replay order and color assignments to another program. The schema is nazori-coordinates/1; pixel coordinates start in the top left. / 自作の再生ツールや変換スクリプトに輪郭・再生順・色の割り当てを渡したいとき。左上が原点で、単位はピクセルです。 |
+
+![PSD export selected in the image preview / 画像プレビューでPSDを選んだ保存画面](docs/assets/export-psd.jpg)
+
+**プロジェクトを保存** stores original images, palettes, region boundaries, pen and speed settings, and the selected image in a project JSON file. Open it with **プロジェクトを開く** to resume. **原稿の操作 → 同じ設定で原稿を差し替え** lets you use your current pen settings with a new image. / **プロジェクトを保存** は原稿・配色・塗り分け境界・ペン・速度・選択中の画像をプロジェクトJSONに記録します。**プロジェクトを開く** で続きから作業できます。**原稿の操作 → 同じ設定で原稿を差し替え** は、今のペン設定で別の原稿をトレスするときに使います。
+
+For the full illustrated workflow, choose **操作マニュアル PDF** in the application header. The PDF includes the file types, API settings, and local MCP setup. / 画面上部の **操作マニュアル PDF** で、画像付きの手順、保存形式、API設定とローカルMCP連携を確認できます。
 
 ## Design and provenance / 設計と来歴
 

@@ -1,4 +1,4 @@
-# AI Tracer Nazori-kun v0.1.1 Technical Report
+# AI Tracer Nazori-kun v0.1.2 Technical Report
 
 November 25, 2026 · FURU
 
@@ -35,3 +35,5 @@ A public demonstration on X and a separate public repository were concept refere
 - [line-trace-strokes](https://github.com/nekomimianko/line-trace-strokes)
 - [Adobe Photoshop File Formats Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/)
 - [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
+Version 0.1.2 updates the user documentation. The tracing, coloring, and export pipelines match v0.1.1. The application header opens the PDF covering operation and API settings.

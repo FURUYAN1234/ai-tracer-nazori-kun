@@ -20,7 +20,8 @@ try {
     git(['fetch', origin, 'refs/heads/gh-pages'], work);
     git(['update-ref', 'refs/heads/gh-pages', 'FETCH_HEAD'], work);
   }
-  await mkdir(path.join(work, 'examples'), { recursive: true });
+  const directories = new Set(publicFiles.map(path.dirname));
+  await Promise.all([...directories].map(directory => mkdir(path.join(work, directory), { recursive: true })));
   await Promise.all(['index.html', '.nojekyll', ...publicFiles].map(file =>
     copyFile(path.join(dist, file), path.join(work, file))));
   git(['add', '--all'], work);
