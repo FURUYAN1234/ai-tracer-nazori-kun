@@ -10,39 +10,64 @@
   <title>AIトレーサー なぞり君</title>
   <link rel="stylesheet" href="style.css">
   <script defer src="engine.js"></script>
-  <script defer src="psd.js"></script>
-  <script defer src="monoline.js"></script>
+  <script defer src="psd.js?v=e50f6de391fc"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>AIトレーサー なぞり君</strong><span class="version">v0.1.0</span></div>
+    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>AIトレーサー なぞり君</strong><span class="version">v0.1.1</span></div>
+    <button id="import" class="ink-button" type="button">画像を取り込む</button>
     <div class="toolbar">
+      <small id="project-saves">原稿・配色・ペン設定を保存して、続きから開けます。</small>
       <button id="open-project" type="button">プロジェクトを開く</button>
       <button id="save-project" type="button" aria-describedby="project-saves">プロジェクトを保存</button>
-      <button id="import" class="ink-button" type="button">＋ 原稿を追加</button>
       <input id="images" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
       <input id="replacement" type="file" accept="image/png,image/jpeg,image/webp" hidden>
       <input id="project" type="file" accept=".json,application/json" hidden>
-      <small id="project-saves">原稿・配色・ペン設定を保存して、続きから開けます。</small>
     </div>
   </header>
   <main>
     <section class="stage" aria-label="原稿と配色">
       <div class="headline">
-        <div><p class="project-label" id="project-name"></p><h1>輪郭と配色の作業台</h1></div>
-        <button class="play-button" id="play" type="button">▶ 工程を再生</button>
+        <div><p class="project-label" id="project-name"></p><h1 id="screen-heading">作業画面</h1></div>
+        <nav class="switch screen-nav" aria-label="画面切り替え">
+          <button id="work-screen" type="button" aria-pressed="true">作業画面</button>
+          <button id="image-screen" type="button" aria-pressed="false">画像一覧</button>
+        </nav>
       </div>
-      <div class="stage-tools">
-        <div class="switch" role="group" aria-label="画面表示">
-          <button data-view="compare" aria-pressed="true">配色比較</button>
-          <button data-view="ink" aria-pressed="false">再構築した線</button>
-          <button data-view="works" aria-pressed="false">作業一覧</button>
+      <div id="import-feedback" class="import-feedback" role="status" aria-atomic="true" hidden>
+        <progress id="import-progress" aria-label="画像の読み込み進行状況" hidden></progress>
+        <span id="import-message"></span>
+      </div>
+      <p id="gallery-hint" class="gallery-hint" hidden>サムネイルを選ぶと、大きな画像で確認できます。</p>
+      <div id="work-controls">
+        <div class="trace-row">
+          <button id="trace" type="button">トレスする</button>
+          <label class="speed-control">描画速度<input id="draw-speed" type="range" min="25" max="250" step="5" value="100"><output id="draw-speed-value">1倍</output></label>
+          <div class="current-source">
+            <small>作業中の原稿</small> <strong id="active-panel-name"></strong>
+            <small id="source-kind"></small>
+          </div>
+          <button class="play-button" id="play" type="button">▶ 工程を再生</button>
         </div>
-        <div class="undo-tools"><button id="undo" disabled>↶ 元に戻す</button><button id="redo" disabled>↷ やり直す</button><button id="reset-demo">作例に戻る</button></div>
-        <button id="jump-export" type="button">書き出しへ</button>
+        <div class="stage-tools">
+          <div id="work-views" class="switch" role="group" aria-label="比較表示">
+            <button id="result-view" data-view="result" type="button" aria-pressed="false" hidden>元絵とトレス結果</button>
+            <button data-view="ink" type="button" aria-pressed="true">元絵と線画</button>
+          </div>
+          <div class="undo-tools">
+            <button id="undo" type="button" disabled>↶ 元に戻す</button>
+            <button id="redo" type="button" disabled>↷ やり直す</button>
+            <details class="source-menu">
+              <summary>原稿の操作</summary>
+              <div>
+                <button id="replace" type="button" title="現在のペン設定で、新しい原稿をトレスできます">同じ設定で原稿を差し替え</button>
+                <button id="reset-demo" type="button">作例に戻る</button>
+              </div>
+            </details>
+          </div>
+        </div>
       </div>
-      <div class="trace-row"><button id="trace" class="ink-button" type="button">トレスする</button><button id="replace" type="button" title="現在のペン設定で、新しい原稿をトレスできます">同じ設定で原稿を差し替え</button><label><input id="auto-color" type="checkbox"> モノクロ原稿をAIで仮配色</label><label class="speed-control">描画速度<input id="draw-speed" type="range" min="25" max="250" step="5" value="100"><output id="draw-speed-value">1倍</output></label><small id="source-kind"></small></div>
       <div id="replay" class="replay" hidden>
         <canvas id="movie" aria-label="線の再構築と彩色の再生"></canvas>
         <div class="timeline">
@@ -55,40 +80,79 @@
         </div>
       </div>
       <div id="view" class="views"></div>
-      <div id="panel-strip" class="panel-strip" aria-label="コマ切り替え"></div>
+      <section id="export-page" aria-labelledby="export-heading" hidden>
+        <div class="preview-heading">
+          <button id="close-export" type="button"></button>
+          <div><p id="export-target"></p><h2 id="export-heading" tabindex="-1"></h2></div>
+        </div>
+        <div class="preview-layout">
+          <figure id="export-image" class="art"></figure>
+          <section class="export-panel" aria-labelledby="save-heading">
+            <h2 id="save-heading">画像を保存</h2>
+            <div class="export-controls">
+              <div>
+                <label for="export-type">保存形式</label>
+                <select id="export-type">
+                  <option value="png">PNG</option>
+                  <option value="psd">PSD</option>
+                  <option value="svg">SVG</option>
+                  <option value="json">座標JSON</option>
+                </select>
+              </div>
+              <button id="export" class="ink-button" type="button">保存</button>
+            </div>
+            <p id="export-help" class="hint"></p>
+            <p id="export-status" class="hint" role="status"></p>
+          </section>
+        </div>
+      </section>
     </section>
-    <aside class="inspector" aria-label="彩色と書き出し">
-      <div class="inspector-head"><div><p class="micro">PALETTE</p><h2>色指定</h2></div><button id="add-role" type="button" aria-label="色グループを追加">＋</button></div>
+    <aside class="inspector" aria-label="線と配色">
+      <section class="ink-settings" aria-labelledby="ink-heading">
+      <h2 id="ink-heading">線の設定</h2>
       <div class="pen-setting"><label for="pen">ペンタッチ</label><select id="pen"><option value="g">Gペン</option><option value="fine">丸ペン</option><option value="brush">筆ペン</option><option value="original">輪郭そのまま</option></select></div>
       <label class="pen-strength" for="strength">Gペンの強さ <output id="strength-value"></output><input type="range" id="strength" min="0" max="100" value="100"></label>
-      <div class="tools" role="group" aria-label="編集ツール">
-        <button data-tool="paint" aria-pressed="true">塗る</button>
-        <button data-tool="pick" aria-pressed="false">色を選ぶ</button>
-        <button data-tool="split" aria-pressed="false">境界を引く</button>
-        <button data-tool="erase" aria-pressed="false">色を外す</button>
-      </div>
-      <div class="roles-label"><span>色レイヤー</span><span>配色 A</span><span>配色 B</span><span>表示</span></div>
-      <div id="roles" class="roles"></div>
-      <div class="quick-row"><span>すぐ変更</span><button id="quick-a" aria-pressed="true" type="button">A</button><button id="quick-b" aria-pressed="false" type="button">B</button></div>
-      <div id="quick-colors" class="quick-colors" role="group" aria-label="選んだ色グループをワンクリックで変更"></div>
-      <form id="role-form" hidden><label for="role-name">グループ名</label><div><input id="role-name" required maxlength="24" autocomplete="off"><button type="submit">追加</button></div></form>
-      <label class="highlight"><input id="highlight" type="checkbox"> 選んだ色の範囲を強調</label>
-      <p class="hint" id="hint"></p>
       <details class="settings">
         <summary>線の読み取り</summary>
         <label for="threshold">濃さのしきい値 <output id="threshold-value"></output></label>
         <input type="range" id="threshold" min="32" max="248" value="180">
         <p>数値を上げると、淡い線も輪郭として拾います。</p>
       </details>
-      <div class="export" aria-labelledby="export-heading">
-        <h3 id="export-heading" tabindex="-1">画像を書き出す</h3>
-        <p id="export-target"></p>
-        <label for="export-type">PNGの内容</label>
-        <div><select id="export-type"><option value="a">配色 A</option><option value="b">配色 B</option><option value="ink">再構築した線画</option><option value="source">元絵</option></select><button id="export" class="ink-button" type="button">PNGを保存</button></div>
-        <div class="export-more"><button id="psd" type="button">PSD・全レイヤー</button><button id="svg" type="button">SVG・ベクター</button><button id="coordinates" type="button">座標 JSON</button></div>
-      </div>
+      </section>
+      <details id="palette-settings" hidden>
+        <summary>色レイヤーを編集</summary>
+        <p class="palette-purpose">同じ線画で2つの配色を試せます。</p>
+        <button id="color-view" data-view="compare" type="button" aria-pressed="false">配色 AとBを比べる</button>
+        <div class="roles-label"><span>色レイヤー</span><span>配色 A</span><span>配色 B</span><span>表示</span></div>
+        <div id="roles" class="roles"></div>
+        <div class="quick-row" role="group" aria-label="色見本の変更先"><span>変更先</span><button id="quick-a" aria-pressed="true" type="button">配色 A</button><button id="quick-b" aria-pressed="false" type="button">配色 B</button></div>
+        <div id="quick-colors" class="quick-colors" role="group" aria-label="選んだ色レイヤーをワンクリックで変更"></div>
+        <label class="highlight"><input id="highlight" type="checkbox"> 選んだ色の輪郭を表示</label>
+      </details>
     </aside>
   </main>
+  <dialog id="color-dialog" aria-labelledby="color-heading">
+    <form id="color-form">
+      <h2 id="color-heading">色を編集</h2>
+      <p id="color-target"></p>
+      <div class="color-comparison">
+        <div><span>現在の色</span><span id="color-original" class="color-chip"></span></div>
+        <div><span>変更後</span><span id="color-preview" class="color-chip"></span></div>
+      </div>
+      <label class="color-code" for="color-hex">カラーコード
+        <input id="color-hex" type="text" pattern="#?[0-9a-fA-F]{6}" maxlength="7" required spellcheck="false" autocomplete="off" autofocus>
+      </label>
+      <div class="color-sliders">
+        <label for="color-red">赤<input id="color-red" data-color-channel type="range" min="0" max="255"></label>
+        <label for="color-green">緑<input id="color-green" data-color-channel type="range" min="0" max="255"></label>
+        <label for="color-blue">青<input id="color-blue" data-color-channel type="range" min="0" max="255"></label>
+      </div>
+      <div class="color-actions">
+        <button id="color-cancel" type="button">キャンセル</button>
+        <button class="ink-button" type="submit">適用</button>
+      </div>
+    </form>
+  </dialog>
   <footer><span>トレスと元色の復元はブラウザー内の画像処理。外部API不要。</span><span id="status" role="status" aria-live="polite"></span></footer>
 </body>
 </html>

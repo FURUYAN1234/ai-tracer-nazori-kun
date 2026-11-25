@@ -343,43 +343,6 @@
     return '#' + color.map(value => Math.round(value).toString(16).padStart(2, '0')).join('');
   }
 
-  function features(layout, region) {
-    const { width, height } = layout;
-    const w = (region.xMax - region.xMin + 1) / width;
-    const h = (region.yMax - region.yMin + 1) / height;
-    return [(region.yMin + region.yMax) / (2 * height), w, h,
-      Math.sqrt(region.size / (width * height)), region.size / (w * h * width * height),
-      Number(region.touchesEdge)];
-  }
-
-  function trainColorModel(samples) {
-    return samples.flatMap(({ layout, markers }) => {
-      const colors = resolveColors(layout, markers);
-      return layout.regions.filter(region => colors.has(region.id))
-        .map(region => ({ role: colors.get(region.id), data: features(layout, region) }));
-    });
-  }
-
-  function suggestColors(layout, model) {
-    const first = new Int32Array(layout.regions.length + 1).fill(-1);
-    for (let i = 0; i < layout.labels.length; i++) {
-      const id = layout.labels[i];
-      if (id > 0 && first[id] === -1) first[id] = i;
-    }
-    const weights = [3, .65, 1, 2, .25, 1.3];
-    return layout.regions.filter(region => region.size >= 10 && model.length).map(region => {
-      const data = features(layout, region);
-      let best = Infinity;
-      let role;
-      for (const example of model) {
-        const cost = data.reduce((sum, value, i) => sum + weights[i] * (value - example.data[i]) ** 2, 0);
-        if (cost < best) { best = cost; role = example.role; }
-      }
-      const point = first[region.id];
-      return { x: point % layout.width, y: Math.floor(point / layout.width), role };
-    });
-  }
-
   function rgb(hex) {
     const n = Number.parseInt(hex.slice(1), 16);
     return [n >> 16, (n >> 8) & 255, n & 255];
@@ -399,8 +362,12 @@
     const { uncolored = '#ffffff', highlight, light = 0 } = options;
     const paper = rgb(uncolored);
     const values = Array.from({ length: regions.length + 1 }, () => paper);
+    const selected = highlight && new Uint8Array(values.length);
+    const edge = Math.max(1, Math.round(Math.max(width, height) / 800));
+    const outlineColor = [185, 32, 125];
     for (const [id, role] of colors) {
       if (Object.hasOwn(palette, role)) values[id] = rgb(palette[role]);
+      if (selected && role === highlight) selected[id] = 1;
     }
     const out = new Uint8ClampedArray(4 * ink.length);
     for (let i = 0; i < ink.length; i++) {
@@ -410,12 +377,13 @@
       const id = ink[i] === 0 ? labels[i] : paintLabel(labels, width, i);
       const color = id > 0 ? values[id] : paper;
       const role = colors.get(id);
-      const active = highlight && role === highlight;
-      const dim = highlight && !active ? 0.37 : 0;
       const tone = role && color !== paper && role !== 'white' ? light * (0.55 - (x / width + y / height) / 2) : 0;
+      const outline = selected?.[labels[i]] && (x < edge || x >= width - edge || y < edge || y >= height - edge
+        || !selected[labels[i - edge]] || !selected[labels[i + edge]]
+        || !selected[labels[i - edge * width]] || !selected[labels[i + edge * width]]);
       for (let channel = 0; channel < 3; channel++) {
         const shaded = tone >= 0 ? color[channel] + (255 - color[channel]) * tone : color[channel] * (1 + tone);
-        out[4 * i + channel] = ((1 - dim) * shaded + dim * 245) * ink[i] / 255;
+        out[4 * i + channel] = outline ? outlineColor[channel] : shaded * ink[i] / 255;
       }
       out[4 * i + 3] = 255;
     }
@@ -484,7 +452,7 @@
   }
 
   const engine = { segment, regionAt, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, stylizeInk,
-    inspectRaster, sampleColors, swatchHex, trainColorModel, suggestColors, makeLayers, makeSvg };
+    inspectRaster, sampleColors, swatchHex, makeLayers, makeSvg };
   if (typeof module !== 'undefined' && module.exports) module.exports = engine;
   else root.KomaEngine = engine;
 })(globalThis);

@@ -2,32 +2,23 @@
   'use strict';
   const E = window.KomaEngine;
   const $ = id => document.getElementById(id);
-  const slots = [
-    ['sky', '空', '#e6b5a5', '#aaa3d3'],
-    ['sun', '太陽', '#fff1b4', '#ffd2dd'],
-    ['water', '水面', '#a3c1b3', '#8184b1'],
-    ['coat', 'コートと帽子', '#d77664', '#545475'],
-    ['hair', '髪', '#6b5556', '#493b63'],
-    ['skin', '肌', '#f5caac', '#efbbc3'],
-    ['accent', '差し色', '#f4bc69', '#d99cb5'],
-    ['white', '白抜き', '#fffafa', '#fbf4ff'],
-    ['eyes', '瞳', '#508b7c', '#73568d'],
-  ];
   const limit = 8;
   const roleLimit = 300;
   const duration = 16700;
   const styles = ['g', 'fine', 'brush', 'original'];
   const quick = ['#f6bfad', '#f8ce78', '#a4ba86', '#528d98', '#797aba', '#ad6798', '#423752', '#fffafa'];
+  const exportLabels = { source: '元絵', ink: '線画', a: '配色 A', b: '配色 B' };
   let state;
   let history = [];
   let future = [];
-  let colorModel;
-  let selection = { index: 0, role: 'coat', variant: 'a', view: 'compare', tool: 'paint' };
-  let splitStart = null;
+  let selection = { index: 0, role: null, variant: 'a', view: 'ink' };
   let replay = null;
   let busy = false;
   let recording = false;
   let exportSelection;
+  let colorEdit;
+  let palettePanel;
+  const colorChannels = [...document.querySelectorAll('[data-color-channel]')];
   const cache = new WeakMap();
 
   function canvas(width, height) {
@@ -44,15 +35,10 @@
   }
 
   async function startDemo() {
-    const training = ['海風の配達員', '振り返る配達員'].map((name, i) => {
-      const sample = window.KomaDemo(Boolean(i));
-      return { ...readInk(sample.canvas), name, markers: sample.markers, barriers: [], traced: true };
-    });
-    colorModel = E.trainColorModel(training.map(panel => ({ layout: E.segment(panel, 180), markers: panel.markers })));
-    const sourceList = [['モノクロ · 海風の配達員', 'examples/mono.png'],
-      ['カラー · 港町の配達員', 'examples/color.png'],
+    const sourceList = [['詳細カラー · 凧職人', 'examples/detailed-color.png'],
       ['詳細モノクロ · 時計職人', 'examples/detailed-mono.png'],
-      ['詳細カラー · 凧職人', 'examples/detailed-color.png']];
+      ['モノクロ · 海風の配達員', 'examples/mono.png'],
+      ['カラー · 港町の配達員', 'examples/color.png']];
     const panels = await Promise.all(sourceList.map(async ([name, src]) => {
       const image = new Image();
       image.src = src;
@@ -62,17 +48,12 @@
       return { ...readInk(sample), name, markers: [], barriers: [], traced: false };
     }));
     state = { name: '付属作例', threshold: 180, pen: 'g', strength: 100, demo: true,
-      roles: defaultRoles(), panels };
-    selection = { index: 0, role: 'coat', variant: 'a', view: 'compare', tool: 'paint' };
+      roles: [], panels };
+    selection = { index: 0, role: null, variant: 'a', view: 'ink' };
     history = [];
     future = [];
-    splitStart = null;
     restoreSpeeds();
     render();
-  }
-
-  function defaultRoles() {
-    return slots.map(([id, name, a, b]) => ({ id, name, a, b }));
   }
 
   function demoFailed() {
@@ -80,22 +61,16 @@
     const blank = canvas(360, 410);
     blank.getContext('2d').fillStyle = '#fff';
     blank.getContext('2d').fillRect(0, 0, 360, 410);
-    state = { name: '原稿を追加してください', threshold: 180, pen: 'g', strength: 100, demo: true,
-      roles: defaultRoles(), panels: [{ ...readInk(blank), name: '原稿', markers: [], barriers: [], traced: false }] };
+    state = { name: '読み込む原稿を選んでください', threshold: 180, pen: 'g', strength: 100, demo: true,
+      roles: [], panels: [{ ...readInk(blank), name: '原稿', markers: [], barriers: [], traced: false }] };
     render();
-    report('作例はローカルサーバーで開くと利用できます。画像は「原稿を追加」から開けます。');
+    report('作例はローカルサーバーで開くと利用できます。「画像を取り込む」から画像を開けます。');
   }
 
   function remember() {
     history.push({ state, selection: { ...selection } });
     if (history.length > 35) history.shift();
     future = [];
-  }
-
-  function modifyPanel(index, change) {
-    remember();
-    state = { ...state, panels: state.panels.map((panel, i) => i === index ? change(panel) : panel) };
-    render();
   }
 
   function geometry(panel) {
@@ -121,8 +96,22 @@
     return model.styles.get(key);
   }
 
-  function palette(variant) {
-    return Object.fromEntries(state.roles.filter(role => !role.hidden).map(role => [role.id, role[variant]]));
+  function roleIds(panel) {
+    return new Set([...(panel.sourceRoles ?? []), ...panel.markers.map(mark => mark.role)]);
+  }
+
+  function panelRoles(panel) {
+    const ids = roleIds(panel);
+    return state.roles.filter(role => ids.has(role.id));
+  }
+
+  function referencedRoles(panels) {
+    const ids = new Set(panels.flatMap(panel => [...roleIds(panel)]));
+    return state.roles.filter(role => ids.has(role.id));
+  }
+
+  function palette(panel, variant) {
+    return Object.fromEntries(panelRoles(panel).filter(role => !role.hidden).map(role => [role.id, role[variant]]));
   }
 
   function assignedColors(panel, layout) {
@@ -133,7 +122,7 @@
     ctx.putImageData(new ImageData(data, panel.width, panel.height), 0, 0);
   }
 
-  function output(panel, mode, editing = false) {
+  function output(panel, mode, showHighlight = false) {
     const result = canvas(panel.width, panel.height);
     const ctx = result.getContext('2d');
     if (mode === 'source' || !panel.traced) {
@@ -142,100 +131,34 @@
     }
     const model = geometry(panel);
     const assignments = assignedColors(panel, model.layout);
-    const colors = mode === 'ink' ? {} : palette(mode);
-    const highlight = editing && $('highlight').checked ? selection.role : undefined;
+    const colors = mode === 'ink' ? {} : palette(panel, mode);
+    const highlight = showHighlight && $('palette-settings').open && $('highlight').checked ? selection.role : undefined;
     pixels(ctx, panel, E.paint(styled(model), model.layout, assignments, colors, { highlight }));
-    if (editing && selection.tool === 'split') showBarriers(ctx, panel);
     return result;
-  }
-
-  function showBarriers(ctx, panel) {
-    const unit = Math.max(1, panel.width / 310);
-    ctx.lineWidth = 2 * unit;
-    ctx.strokeStyle = '#ad377d';
-    ctx.fillStyle = '#ad377d';
-    ctx.setLineDash([4 * unit, 3 * unit]);
-    for (const [x0, y0, x1, y1] of panel.barriers) {
-      ctx.beginPath();
-      ctx.moveTo(x0 + .5, y0 + .5);
-      ctx.lineTo(x1 + .5, y1 + .5);
-      ctx.stroke();
-    }
-    if (splitStart?.panel === panel) {
-      ctx.beginPath();
-      ctx.arc(splitStart.x, splitStart.y, 4 * unit, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function pointOnCanvas(event, image) {
-    const box = image.getBoundingClientRect();
-    const scale = Math.min(box.width / image.width, box.height / image.height);
-    const x = Math.floor((event.clientX - box.left - (box.width - image.width * scale) / 2) / scale);
-    const y = Math.floor((event.clientY - box.top - (box.height - image.height * scale) / 2) / scale);
-    if (x >= 0 && x < image.width && y >= 0 && y < image.height) return [x, y];
-    return null;
-  }
-
-  function editCanvas(event, image, index, variant) {
-    const point = pointOnCanvas(event, image);
-    if (!point) return;
-    const [x, y] = point;
-    const panel = state.panels[index];
-    selection.index = index;
-    selection.variant = variant;
-    if (selection.tool === 'split') {
-      if (splitStart?.panel !== panel) {
-        splitStart = { panel, x, y };
-        render();
-        return;
-      }
-      const start = splitStart;
-      if (start.x === x && start.y === y) return;
-      splitStart = null;
-      modifyPanel(index, old => ({ ...old, barriers: [...old.barriers, [start.x, start.y, x, y]] }));
-      report('塗り分け用の境界を追加しました。');
-      return;
-    }
-    const { layout } = geometry(panel);
-    const id = E.regionAt(layout, x, y);
-    if (id <= 0) return report('線の内側を選んでください。');
-    const current = assignedColors(panel, layout).get(id);
-    if (selection.tool === 'pick') {
-      if (!current) return report('この部分には色レイヤーがありません。');
-      selection.role = current;
-      render();
-      const row = [...$('roles').children].find(child => child.dataset.role === current);
-      row?.scrollIntoView({ block: 'nearest' });
-      return report(state.roles.find(role => role.id === current).name + 'を選びました。');
-    }
-    const next = selection.tool === 'erase' ? undefined : selection.role;
-    if (current === next) return;
-    modifyPanel(index, old => {
-      const markers = old.markers.filter(marker => E.regionAt(layout, marker.x, marker.y) !== id);
-      const sourceRole = old.sourceRoles?.[layout.regions[id - 1].colorClass] ?? undefined;
-      if (next !== sourceRole) markers.push({ x, y, role: next ?? null });
-      return { ...old, markers };
-    });
-    report(next ? state.roles.find(role => role.id === next).name + 'を割り当てました。' : '色の割り当てを外しました。');
   }
 
   function figure(index, mode, title, caption) {
     const panel = state.panels[index];
-    const editable = panel.traced && (mode === 'a' || mode === 'b');
-    const image = output(panel, mode, editable);
+    const coloredView = panel.traced && (mode === 'a' || mode === 'b');
+    const image = output(panel, mode, coloredView);
     image.setAttribute('aria-label', panel.name + ' ' + title);
     const fig = document.createElement('figure');
-    fig.className = editable ? 'art editable' : 'art';
+    fig.className = 'art';
     fig.dataset.variant = mode;
     const text = document.createElement('figcaption');
     const name = document.createElement('span');
     const extra = document.createElement('small');
     name.textContent = title;
     extra.textContent = caption;
-    text.append(name, extra);
+    if (!panel.traced) extra.className = 'pending-trace';
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'art-save';
+    save.textContent = '保存…';
+    save.setAttribute('aria-label', exportLabels[mode] + 'を保存');
+    save.onclick = () => openExport(panel, mode, save);
+    text.append(name, extra, save);
     fig.append(text, image);
-    if (editable) image.addEventListener('click', event => editCanvas(event, image, index, mode));
     return fig;
   }
 
@@ -245,43 +168,79 @@
     if (view === 'works') {
       $('view').replaceChildren(...state.panels.map((panel, i) => workCard(panel, i, variant)));
     } else if (!state.panels[index].traced) {
-      $('view').replaceChildren(figure(index, 'source', '取り込んだ原稿', 'トレス前'));
+      $('view').replaceChildren(figure(index, 'source', state.demo ? '元絵' : '取り込んだ原稿', 'トレス前'));
     } else if (view === 'ink') {
       const model = geometry(state.panels[index]);
-      $('view').replaceChildren(figure(index, 'source', '取り込んだ原稿', state.panels[index].isColor ? 'カラー' : 'モノクロ'),
-        figure(index, 'ink', '再構築した線', model.contours.length + ' 個の閉境界'));
+      $('view').replaceChildren(figure(index, 'source', '元絵', state.panels[index].isColor ? 'カラー' : 'モノクロ'),
+        figure(index, 'ink', '線画', model.contours.length + ' 個の閉境界'));
+    } else if (view === 'result') {
+      $('view').replaceChildren(figure(index, 'source', '元絵', state.panels[index].isColor ? 'カラー' : 'モノクロ'),
+        figure(index, variant, 'トレス結果', exportLabels[variant]));
     } else {
-      $('view').replaceChildren(figure(index, 'a', '配色 A', '同じコマで比較'),
-        figure(index, 'b', '配色 B', '同じコマで比較'));
+      $('view').replaceChildren(figure(index, 'a', '配色 A', ''),
+        figure(index, 'b', '配色 B', ''));
     }
   }
 
   function workCard(panel, index, variant) {
-    const card = document.createElement('button');
-    card.type = 'button';
+    const card = document.createElement('article');
     card.className = 'work-card';
-    card.setAttribute('aria-pressed', String(index === selection.index));
-    const image = document.createElement('img');
-    image.alt = '';
-    image.src = thumbnail(panel, variant, 146, 132);
-    const name = document.createElement('span');
+    const name = document.createElement('h2');
     name.textContent = panel.name;
-    const status = document.createElement('small');
-    status.textContent = (panel.traced ? 'トレス済み' : '未トレス') + (index === selection.index ? ' · 選択中' : '');
-    card.append(image, name, status);
-    card.onclick = () => {
+    const previews = document.createElement('div');
+    previews.className = 'work-previews';
+    const resultMode = panel.traced ? (panelHasColor(panel) ? variant : 'ink') : null;
+    for (const [title, mode] of [['元絵', 'source'], ['作業後', resultMode]]) {
+      const preview = document.createElement(mode ? 'button' : 'div');
+      preview.className = 'work-preview';
+      const label = document.createElement('span');
+      label.textContent = title;
+      preview.append(label);
+      if (mode) {
+        preview.type = 'button';
+        preview.setAttribute('aria-label', panel.name + 'の' + title + 'を表示');
+        preview.onclick = () => openExport(panel, mode, preview);
+        const image = document.createElement('img');
+        image.alt = '';
+        image.src = thumbnail(panel, mode, 280, 300);
+        preview.append(image);
+        if (title === '作業後') {
+          const caption = document.createElement('small');
+          caption.textContent = exportLabels[mode];
+          preview.append(caption);
+        }
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'work-preview-empty';
+        placeholder.textContent = 'トレス前';
+        preview.append(placeholder);
+      }
+      previews.append(preview);
+    }
+    const edit = document.createElement('button');
+    edit.className = 'work-edit';
+    edit.type = 'button';
+    edit.textContent = '作業画面で開く';
+    edit.setAttribute('aria-label', panel.name + 'を作業画面で開く');
+    edit.onclick = () => {
+      if (selection.index !== index) selection.variant = 'a';
       selection.index = index;
-      selection.view = panel.traced && panelHasColor(panel) ? 'compare' : 'ink';
-      splitStart = null;
+      selection.view = defaultWorkView(panel);
       render();
-      $('panel-strip').children[index].focus({ preventScroll: true });
+      $('work-screen').focus();
     };
+    card.append(name, previews, edit);
     return card;
+  }
+
+  function defaultWorkView(panel) {
+    return panel.traced && panel.isColor ? 'result' : 'ink';
   }
 
   function thumbnail(panel, variant, width, height) {
     const thumb = canvas(width, height);
     const ctx = thumb.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
     const fit = Math.min(width / panel.width, height / panel.height);
     const w = panel.width * fit, h = panel.height * fit;
     ctx.drawImage(output(panel, variant), (width - w) / 2, (height - h) / 2, w, h);
@@ -292,35 +251,11 @@
     return panel.sourceRoles?.some(Boolean) || panel.markers.some(marker => marker.role);
   }
 
-  function strip() {
-    $('panel-strip').hidden = selection.view === 'works';
-    $('panel-strip').replaceChildren(...state.panels.map((panel, i) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'panel-button';
-      button.setAttribute('aria-pressed', String(i === selection.index));
-      const image = document.createElement('img');
-      image.alt = '';
-      image.src = thumbnail(panel, selection.variant, 44, 46);
-      const name = document.createElement('span');
-      name.textContent = (i + 1) + ' · ' + panel.name;
-      button.append(image, name);
-      button.addEventListener('click', () => {
-        closeReplay();
-        selection.index = i;
-        splitStart = null;
-        render();
-        $('panel-strip').children[i].focus({ preventScroll: true });
-      });
-      return button;
-    }));
-  }
-
   function renderRoles() {
     const panel = state.panels[selection.index];
     const usage = panel.traced ? assignedColors(panel, geometry(panel).layout) : new Map();
     const used = new Set(usage.values());
-    const roles = [...state.roles].sort((a, b) => Number(used.has(b.id)) - Number(used.has(a.id)));
+    const roles = panelRoles(panel).sort((a, b) => Number(used.has(b.id)) - Number(used.has(a.id)));
     const list = $('roles');
     const scroll = list.scrollTop;
     list.replaceChildren(...roles.map(role => {
@@ -334,18 +269,20 @@
       name.setAttribute('aria-pressed', String(role.id === selection.role));
       name.addEventListener('click', () => {
         selection.role = role.id;
-        selection.tool = 'paint';
-        splitStart = null;
         render();
         [...list.children].find(child => child.dataset.role === role.id)?.firstElementChild.focus({ preventScroll: true });
       });
       row.append(name);
       for (const variant of ['a', 'b']) {
-        const picker = document.createElement('input');
-        picker.type = 'color';
-        picker.value = role[variant];
+        const picker = document.createElement('button');
+        picker.type = 'button';
+        picker.className = 'layer-color';
+        picker.dataset.colorVariant = variant;
         picker.setAttribute('aria-label', role.name + ' 配色 ' + variant.toUpperCase());
-        picker.addEventListener('change', () => recolor(role.id, variant, picker.value, true));
+        const chip = document.createElement('span');
+        chip.style.backgroundColor = role[variant];
+        picker.append(chip);
+        picker.onclick = () => openColorEditor(role, variant);
         row.append(picker);
       }
       const visible = document.createElement('input');
@@ -374,12 +311,50 @@
     selection.variant = variant;
     state = { ...state, roles: state.roles.map(item => item.id === id ? { ...item, [variant]: hex } : item) };
     render(refresh);
-    report('同じ色グループを使うコマを更新しました。');
+    report('配色 ' + variant.toUpperCase() + ' の色を更新しました。');
   }
+
+  function setColorPreview(hex) {
+    $('color-preview').style.backgroundColor = hex;
+    colorChannels.forEach((control, index) => { control.value = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16); });
+  }
+
+  function openColorEditor(role, variant) {
+    colorEdit = { id: role.id, variant };
+    const hex = role[variant];
+    $('color-target').textContent = role.name + ' · 配色 ' + variant.toUpperCase();
+    $('color-original').style.backgroundColor = hex;
+    $('color-hex').value = hex;
+    setColorPreview(hex);
+    $('color-dialog').showModal();
+  }
+
+  $('color-hex').oninput = event => {
+    const hex = '#' + event.target.value.replace(/^#/, '');
+    if (colorPattern.test(hex)) setColorPreview(hex);
+  };
+  for (const channel of colorChannels) channel.oninput = () => {
+    const hex = '#' + colorChannels.map(control => Number(control.value).toString(16).padStart(2, '0')).join('');
+    $('color-hex').value = hex;
+    $('color-preview').style.backgroundColor = hex;
+  };
+  $('color-cancel').onclick = () => $('color-dialog').close();
+  $('color-form').onsubmit = event => {
+    event.preventDefault();
+    const { id, variant } = colorEdit;
+    const hex = '#' + $('color-hex').value.replace(/^#/, '').toLowerCase();
+    $('color-dialog').close();
+    recolor(id, variant, hex, true);
+    const row = [...$('roles').children].find(element => element.dataset.role === id);
+    row?.querySelector('[data-color-variant="' + variant + '"]')?.focus({ preventScroll: true });
+  };
 
   function renderQuick() {
     for (const variant of ['a', 'b']) $('quick-' + variant).setAttribute('aria-pressed', String(selection.variant === variant));
     const role = state.roles.find(item => item.id === selection.role);
+    $('quick-colors').previousElementSibling.hidden = !role;
+    $('quick-colors').hidden = !role;
+    if (!role) return;
     $('quick-colors').replaceChildren(...quick.map((hex, i) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -393,6 +368,26 @@
     }));
   }
 
+  function showsPalette() {
+    const panel = state.panels[selection.index];
+    return panel.traced && (panel.isColor || panelHasColor(panel)) && ['compare', 'result'].includes(selection.view);
+  }
+
+  function renderScreen() {
+    const gallery = selection.view === 'works';
+    const preview = Boolean(exportSelection);
+    $('screen-heading').textContent = preview ? '画像プレビュー' : gallery ? '画像一覧' : '作業画面';
+    $('work-screen').setAttribute('aria-pressed', String(!gallery));
+    $('image-screen').setAttribute('aria-pressed', String(gallery));
+    document.querySelector('main').classList.toggle('single-screen', gallery || preview);
+    document.querySelector('.inspector').hidden = gallery || preview;
+    $('gallery-hint').hidden = !gallery || preview;
+    $('work-controls').hidden = gallery || preview;
+    $('view').hidden = preview || Boolean(replay);
+    $('export-page').hidden = !preview;
+    $('palette-settings').hidden = !showsPalette() || Boolean(replay);
+  }
+
   function render(refreshRoles = true) {
     $('project-name').textContent = state.name;
     $('threshold').value = state.threshold;
@@ -404,30 +399,38 @@
     $('strength-value').textContent = state.strength + '%';
     $('strength').disabled = state.pen !== 'g';
     const panel = state.panels[selection.index];
-    $('export-target').textContent = panel.name;
-    for (const id of ['psd', 'svg', 'coordinates']) $(id).disabled = !panel.traced;
-    if (exportSelection?.ink !== panel.ink || exportSelection?.traced !== panel.traced) {
-      exportSelection = panel;
-      $('export-type').value = !panel.traced ? 'source' : panelHasColor(panel) ? selection.variant : 'ink';
+    if (palettePanel !== panel) {
+      $('palette-settings').open = false;
+      $('highlight').checked = false;
+      palettePanel = panel;
     }
-    $('export').disabled = !panel.traced && $('export-type').value !== 'source';
+    const roles = panelRoles(panel);
+    if (!roles.some(role => role.id === selection.role)) selection.role = roles[0]?.id ?? null;
+    if (exportSelection && !state.panels.includes(exportSelection.panel)) clearExport();
+    renderScreen();
+    $('active-panel-name').textContent = panel.name;
+    $('work-views').hidden = !panel.traced;
+    $('result-view').hidden = !panel.isColor && !panelHasColor(panel);
+    $('play').hidden = !panel.traced;
     updateSourceKind();
     for (const el of document.querySelectorAll('[data-view]')) el.setAttribute('aria-pressed', String(el.dataset.view === selection.view));
-    for (const el of document.querySelectorAll('[data-tool]')) el.setAttribute('aria-pressed', String(el.dataset.tool === selection.tool));
-    const selected = state.roles.find(role => role.id === selection.role);
-    $('hint').textContent = selection.tool === 'split'
-      ? (splitStart ? '次に、境界の終点をクリック。' : '塗り漏れを止めたい場所の始点と終点をクリック。')
-      : selection.tool === 'erase' ? '色を外したい領域をクリック。'
-        : selection.tool === 'pick' ? '変えたい色を絵の上でクリック。'
-        : '「' + selected.name + '」にしたい領域をクリック。';
-    if (refreshRoles) renderRoles();
-    renderQuick();
+    if (showsPalette()) {
+      if (refreshRoles) renderRoles();
+      renderQuick();
+    }
     drawViews();
-    strip();
   }
 
   function report(message) {
     $('status').textContent = message;
+  }
+
+  function setImportFeedback(kind = '', message = '') {
+    const feedback = $('import-feedback');
+    feedback.dataset.state = kind;
+    $('import-progress').hidden = kind !== 'busy';
+    $('import-message').textContent = message;
+    feedback.hidden = !message;
   }
 
   function updateSourceKind() {
@@ -481,7 +484,7 @@
     const data = JSON.parse(await file.text());
     if (!data || data.format !== 'koma-iro/1' || !title(data.name, 120)
         || !Number.isInteger(data.threshold) || data.threshold < 32 || data.threshold > 248
-        || !Array.isArray(data.roles) || !data.roles.length || data.roles.length > roleLimit
+        || !Array.isArray(data.roles) || data.roles.length > roleLimit
         || !data.roles.every(role => role && typeof role.id === 'string' && rolePattern.test(role.id) && title(role.name, 24)
           && typeof role.a === 'string' && colorPattern.test(role.a) && typeof role.b === 'string' && colorPattern.test(role.b))
         || !Array.isArray(data.panels) || !data.panels.length || data.panels.length > limit) throw new Error('このアプリで保存したプロジェクトを選んでください。');
@@ -513,12 +516,18 @@
     const files = [...input.files];
     input.value = '';
     if (!files.length || busy) return;
+    const importing = input === $('images');
     busy = true;
     $('import').disabled = $('open-project').disabled = true;
+    if (importing) setImportFeedback('busy', '画像を読み込み中…');
     try {
       await action(files);
     } catch (error) {
-      report(error instanceof SyntaxError ? 'JSONを読み取れませんでした。' : error.message || 'ファイルを読み取れませんでした。');
+      const message = error instanceof SyntaxError ? 'JSONを読み取れませんでした。'
+        : importing && error instanceof DOMException ? '画像を開けませんでした。'
+          : error.message || 'ファイルを読み取れませんでした。';
+      if (importing) setImportFeedback('error', message);
+      report(message);
     } finally {
       busy = false;
       $('import').disabled = $('open-project').disabled = false;
@@ -527,70 +536,88 @@
 
   function tracePanels() {
     if (busy) return;
-    const pending = !state.panels[selection.index].traced;
-    const targets = state.panels.map((_, i) => i === selection.index);
-    const auto = $('auto-color').checked;
     closeReplay();
-    splitStart = null;
-    const active = state.panels[selection.index];
-    if (!pending && panelHasColor(active)
-      && !window.confirm('このコマの色の割り当てを作り直しますか？')) return;
-    remember();
-    const roles = [...state.roles];
-    function importedRole(hex) {
-      const exact = roles.find(role => role.a.toLowerCase() === hex);
-      if (exact) return exact.id;
-      if (roles.length < roleLimit) {
-        const id = 'c-' + hex.slice(1);
-        const existing = roles.find(role => role.id === id);
-        if (existing) return existing.id;
+    const index = selection.index;
+    const active = state.panels[index];
+    if (active.traced && panelHasColor(active)
+      && !window.confirm('この原稿の色を元絵から取り直しますか？')) return;
+    setImportFeedback();
+    const panel = { ...active, markers: [], sourceRoles: [], traced: true };
+    const panels = state.panels.map((item, i) => i === index ? panel : item);
+    const roles = referencedRoles(panels);
+    if (panel.isColor) {
+      const colors = panel.palette.map(E.swatchHex);
+      if (roles.length + colors.filter(hex => hex !== '#ffffff').length > roleLimit) {
+        return report('このプロジェクトで扱える色レイヤー数を超えました。');
+      }
+      const prefix = 'c-' + crypto.randomUUID().replaceAll('-', '') + '-';
+      panel.sourceRoles = colors.map((hex, i) => {
+        if (hex === '#ffffff') return null;
+        const id = prefix + i;
         roles.push({ id, name: '原稿色 ' + hex, a: hex, b: hex });
         return id;
-      }
-      const channels = color => color.slice(1).match(/../g).map(channel => parseInt(channel, 16));
-      const rgb = channels(hex);
-      const score = role => channels(role.a).reduce((sum, value, i) => sum + (value - rgb[i]) ** 2, 0);
-      return roles.reduce((best, role) => score(role) < score(best) ? role : best).id;
+      });
     }
-    const panels = state.panels.map((panel, i) => {
-      if (!targets[i]) return panel;
-      const layout = geometry(panel).layout;
-      let markers = [];
-      let sourceRoles = [];
-      if (panel.isColor) {
-        sourceRoles = panel.palette.map(E.swatchHex).map(hex => hex === '#ffffff' ? null : importedRole(hex));
-      } else if (auto) {
-        const model = colorModel.filter(example => roles.some(role => role.id === example.role));
-        markers = E.suggestColors(layout, model.length ? model : colorModel.map(example => ({ ...example, role: roles[0].id })));
-      }
-      return { ...panel, markers, sourceRoles, traced: true };
-    });
+    remember();
     state = { ...state, roles, panels };
-    const panel = panels[selection.index];
-    const initialRole = panel.markers[0]?.role ?? panel.sourceRoles.find(Boolean);
-    selection.view = initialRole ? 'compare' : 'ink';
+    selection.view = defaultWorkView(panel);
     selection.variant = 'a';
-    if (initialRole) selection.role = initialRole;
+    selection.role = panel.sourceRoles.find(Boolean) ?? null;
     render();
     report('下絵から描き始めます。');
-    openReplay();
+    openReplay({ returnToComparison: true });
   }
 
-  function savePsd() {
-    const panel = state.panels[selection.index];
+  function openExport(panel, mode, opener) {
+    exportSelection = { panel, mode, opener };
+    const image = output(panel, mode);
+    image.setAttribute('aria-label', panel.name + ' ' + exportLabels[mode]);
+    $('export-image').replaceChildren(image);
+    $('export-target').textContent = panel.name;
+    $('export-heading').textContent = exportLabels[mode];
+    $('close-export').textContent = selection.view === 'works' ? '← 画像一覧に戻る' : '← 作業画面に戻る';
+    const formats = mode === 'source' ? ['png']
+      : mode === 'ink' && panelHasColor(panel) ? ['png', 'svg']
+        : ['png', 'psd', 'svg', 'json'];
+    const field = $('export-type');
+    for (const option of field.options) {
+      option.hidden = option.disabled = !formats.includes(option.value);
+    }
+    field.value = 'png';
+    $('export-help').textContent = mode === 'source' ? '元絵は PNG で保存できます。'
+      : formats.length === 2 ? '色レイヤー付きの PSD と座標 JSON は、配色 A または B の画像から保存できます。' : '';
+    $('export-status').textContent = '';
+    renderScreen();
+    $('export-heading').focus();
+  }
+
+  function clearExport() {
+    exportSelection = null;
+    $('export-image').replaceChildren();
+  }
+
+  function closeExport() {
+    const opener = exportSelection?.opener;
+    clearExport();
+    render();
+    if (!opener) return;
+    // Re-rendered canvases and thumbnails replace the old controls.
+    const label = opener.getAttribute('aria-label');
+    [...$('view').querySelectorAll('button')].find(button => button.getAttribute('aria-label') === label)?.focus();
+  }
+
+  function savePsd(panel, mode) {
     const model = geometry(panel);
     const pen = styled(model);
     const assignments = assignedColors(panel, model.layout);
-    const colors = palette(selection.variant);
-    const roles = state.roles.map(role => ({ ...role, hex: role[selection.variant] }));
+    const colors = mode === 'ink' ? {} : palette(panel, mode);
+    const roles = mode === 'ink' ? [] : panelRoles(panel).map(role => ({ ...role, hex: role[mode] }));
     const stack = E.makeLayers(pen, model.layout, assignments, roles);
     const layers = window.KomaPSD(panel, stack, E.paint(pen, model.layout, assignments, colors));
-    download(new Blob(layers, { type: 'image/vnd.adobe.photoshop' }), panel.name + '.psd');
-    report('ペン、色別 ' + (stack.length - 2) + ' 層、用紙をPSDに保存します。');
+    downloadExport(new Blob(layers, { type: 'image/vnd.adobe.photoshop' }), panel.name + (mode === 'b' ? '-b' : '') + '.psd');
   }
 
-  function saveVector(format) {
-    const panel = state.panels[selection.index];
+  function saveVector(format, panel, mode) {
     const model = geometry(panel);
     const { width, height } = panel;
     const pen = styled(model);
@@ -598,32 +625,39 @@
     const contours = state.pen === 'original' ? model.contours : E.traceInk(pen, 192);
     if (format === 'svg') {
       const assignments = assignedColors(panel, model.layout);
-      const layers = E.makeLayers(pen, model.layout, assignments, state.roles.map(role => ({ ...role, hex: role[selection.variant] })));
+      const roles = mode === 'ink' ? [] : panelRoles(panel).map(role => ({ ...role, hex: role[mode] }));
+      const layers = E.makeLayers(pen, model.layout, assignments, roles);
       const xml = E.makeSvg(panel, contours, layers);
-      download(new Blob([xml], { type: 'image/svg+xml' }), panel.name + '.svg');
+      const suffix = mode === 'b' ? '-b' : mode === 'ink' && panelHasColor(panel) ? '-ink' : '';
+      downloadExport(new Blob([xml], { type: 'image/svg+xml' }), panel.name + suffix + '.svg');
     } else {
       const data = { format: 'nazori-coordinates/1', units: 'px', origin: 'top-left', width, height, pen: state.pen,
         strength: state.strength,
         inkContours: contours.map(({ points }) => ({ closed: true, points })),
         replayContours: [...model.contours].sort((a, b) => b.length - a.length)
           .map(({ points, length }) => ({ closed: true, length, points })),
-        marks: panel.markers, sourceRoles: panel.sourceRoles, colorGroups: state.roles, separators: panel.barriers };
-      download(new Blob([JSON.stringify(data)], { type: 'application/json' }), panel.name + '-coordinates.json');
+        marks: panel.markers, sourceRoles: panel.sourceRoles, colorGroups: panelRoles(panel), separators: panel.barriers };
+      downloadExport(new Blob([JSON.stringify(data)], { type: 'application/json' }), panel.name + '-coordinates.json');
     }
-    report((format === 'svg' ? '色とペンのベクターSVG' : '座標JSON') + 'をダウンロードします。');
   }
 
-  function openReplay() {
+  function downloadExport(blob, name) {
+    download(blob, name);
+    $('export-status').textContent = name + ' のダウンロードを開始しました。';
+  }
+
+  function openReplay({ returnToComparison = false } = {}) {
     if (replay) closeReplay();
     const panel = state.panels[selection.index];
     const model = geometry(panel);
     const { contours, layout } = model;
     const rebuilt = styled(model);
     const assignments = assignedColors(panel, layout);
-    const colors = E.paint(rebuilt, layout, assignments, palette(selection.variant));
+    const swatches = palette(panel, selection.variant);
+    const colors = E.paint(rebuilt, layout, assignments, swatches);
     const raw = panel.rgba;
     const inkPixels = rebuilt.ink;
-    const { timing, jobs } = paintPlan(layout, assignments, palette(selection.variant));
+    const { timing, jobs } = paintPlan(layout, assignments, swatches);
     const paths = [...contours].sort((a, b) => b.length - a.length);
     const total = paths.reduce((sum, shape) => sum + E.traceWeight(shape.length), 0);
     const distance = paths.reduce((sum, shape) => sum + shape.length, 0);
@@ -632,11 +666,11 @@
     const image = $('movie');
     image.width = panel.width;
     image.height = panel.height;
-    replay = { panel, paths, total, colors, raw, inkPixels, inkTimeline, timing, jobs,
-      colorStart: jobs.length ? .67 : .99, duration: (jobs.length ? duration : 11100) + extraTime,
+    replay = { panel, paths, total, colors, raw, inkPixels, inkTimeline, timing, jobs, returnToComparison,
+      colorStart: jobs.length ? .67 : 1, duration: (jobs.length ? duration : 11100) + extraTime,
       ctx: image.getContext('2d'), frame: new ImageData(panel.width, panel.height), position: 0, running: false };
-    $('view').hidden = true;
     $('replay').hidden = false;
+    renderScreen();
     updateSourceKind();
     drawReplay(0);
     resumeReplay();
@@ -762,6 +796,12 @@
     const visible = model === replay;
     model.position = t;
     if (visible) $('scrub').value = Math.round(t * 1000);
+    if (t === 1) {
+      if (visible) $('phase').textContent = '仕上がり';
+      frame.data.set(colors);
+      ctx.putImageData(frame, 0, 0);
+      return;
+    }
     const contourEnd = colorStart * .95;
     if (t < colorStart) {
       const progress = t / contourEnd;
@@ -786,12 +826,12 @@
       }
       return;
     }
-    if (visible) $('phase').textContent = t === 1 ? '仕上がり' : '彩色';
+    if (visible) $('phase').textContent = '彩色';
     const colorTime = (t - colorStart) / (1 - colorStart);
     const d = frame.data;
     for (let i = 0; i < timing.length; i++) {
       const k = i * 4;
-      const alpha = t === 1 ? 1 : Math.min(1, Math.max(0, (colorTime - timing[i]) / .018));
+      const alpha = Math.min(1, Math.max(0, (colorTime - timing[i]) / .018));
       const base = inkPixels[i];
       d[k] = base + (colors[k] - base) * alpha;
       d[k + 1] = base + (colors[k + 1] - base) * alpha;
@@ -799,7 +839,7 @@
       d[k + 3] = 255;
     }
     ctx.putImageData(frame, 0, 0);
-    const active = t < 1 && jobs.find(job => colorTime >= job.start && colorTime < job.start + job.length);
+    const active = jobs.find(job => colorTime >= job.start && colorTime < job.start + job.length);
     if (active) {
       let index = Math.min(24, Math.floor(25 * (colorTime - active.start) / active.length));
       while (index >= 0 && !active.samples[index]) index--;
@@ -821,8 +861,13 @@
       const t = Math.min(1, (now - start) / cycle);
       drawReplay(t);
       if (t === 1) {
-        pauseReplay();
-        report('工程の再生が終わりました。');
+        if (model.returnToComparison) {
+          closeReplay();
+          report('トレスが完了しました。');
+        } else {
+          pauseReplay();
+          report('工程の再生が終わりました。');
+        }
       }
       else model.raf = requestAnimationFrame(tick);
     }
@@ -842,9 +887,11 @@
     pauseReplay();
     replay = null;
     $('replay').hidden = true;
-    $('view').hidden = false;
     $('play').textContent = '▶ 工程を再生';
-    if (state) updateSourceKind();
+    if (state) {
+      renderScreen();
+      updateSourceKind();
+    }
   }
 
   function saveVideo() {
@@ -905,16 +952,25 @@
   document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => {
     closeReplay();
     selection.view = button.dataset.view;
-    splitStart = null;
-    render(false);
+    render();
   }));
-  document.querySelectorAll('[data-tool]').forEach(button => button.addEventListener('click', () => {
+  $('work-screen').onclick = () => {
+    if (replay) {
+      closeReplay();
+      return;
+    }
+    if (!exportSelection && selection.view !== 'works') return;
+    if (selection.view === 'works') selection.view = defaultWorkView(state.panels[selection.index]);
+    clearExport();
+    render();
+  };
+  $('image-screen').onclick = () => {
+    if (!exportSelection && selection.view === 'works') return;
     closeReplay();
-    selection.tool = button.dataset.tool;
-    if (selection.view === 'ink') selection.view = 'compare';
-    splitStart = null;
-    render(false);
-  }));
+    selection.view = 'works';
+    clearExport();
+    render();
+  };
   function rewind() {
     pauseReplay();
     drawReplay(0);
@@ -953,7 +1009,6 @@
     future.push({ state, selection: { ...selection } });
     closeReplay();
     ({ state, selection } = prior);
-    splitStart = null;
     render();
     report('前の編集に戻しました。');
   };
@@ -963,7 +1018,6 @@
     history.push({ state, selection: { ...selection } });
     closeReplay();
     ({ state, selection } = next);
-    splitStart = null;
     render();
     report('取り消した編集をやり直しました。');
   };
@@ -972,10 +1026,14 @@
     closeReplay();
     try {
       await startDemo();
+      setImportFeedback();
       report('トレス前の作例を開きました。');
     } catch { demoFailed(); }
   };
   $('highlight').onchange = () => render(false);
+  $('palette-settings').ontoggle = () => {
+    if (state && !replay && showsPalette() && $('highlight').checked) drawViews();
+  };
   $('pen').onchange = event => {
     remember();
     closeReplay();
@@ -998,51 +1056,28 @@
     render(false);
   };
   $('trace').onclick = tracePanels;
-  $('psd').onclick = savePsd;
-  $('svg').onclick = () => saveVector('svg');
-  $('coordinates').onclick = () => saveVector('json');
   $('threshold').oninput = event => { $('threshold-value').textContent = event.target.value; };
   $('threshold').onchange = event => {
     remember();
     closeReplay();
-    splitStart = null;
     state = { ...state, threshold: Number(event.target.value) };
     render(false);
   };
-  $('add-role').onclick = () => {
-    $('role-form').hidden = !$('role-form').hidden;
-    if (!$('role-form').hidden) $('role-name').focus();
-  };
-  $('role-form').onsubmit = event => {
-    event.preventDefault();
-    const name = $('role-name').value.trim();
-    if (!name || state.roles.some(role => role.name === name)) return report('既存の色グループと異なる名前を入力してください。');
-    if (state.roles.length >= roleLimit) return report('色グループは' + roleLimit + '件までです。');
-    remember();
-    const id = 'color-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-    state = { ...state, roles: [...state.roles, { id, name, a: '#c58070', b: '#8275bc' }] };
-    selection.role = id;
-    selection.tool = 'paint';
-    splitStart = null;
-    $('role-form').hidden = true;
-    $('role-name').value = '';
-    render();
-    report('色グループを追加しました。');
-  };
   $('save-project').onclick = saveProject;
-  $('jump-export').onclick = () => $('export-heading').focus();
   $('open-project').onclick = () => $('project').click();
   $('project').onchange = () => readFiles($('project'), async ([file]) => {
     const project = await readProject(file);
     remember();
     closeReplay();
+    clearExport();
+    setImportFeedback();
     state = project;
     const preferences = state.preferences;
     const index = coordinate(preferences?.index, state.panels.length) ? preferences.index : 0;
-    const role = state.roles.some(item => item.id === preferences?.role) ? preferences.role : state.roles[0].id;
-    selection = { index, role, variant: preferences?.variant === 'b' ? 'b' : 'a', view: 'compare', tool: 'paint' };
+    const role = preferences?.role ?? null;
+    selection = { index, role, variant: preferences?.variant === 'b' ? 'b' : 'a',
+      view: defaultWorkView(project.panels[index]) };
     restoreSpeeds(preferences);
-    splitStart = null;
     render();
     report(project.panels.length + '枚のプロジェクトを開きました。');
   });
@@ -1056,11 +1091,12 @@
       const image = await bitmapToInk(file);
       if (state.panels[index] !== original) return report('原稿が切り替わりました。差し替える画像をもう一度選んでください。');
       closeReplay();
-      splitStart = null;
-      selection.view = 'compare';
+      remember();
+      selection.view = 'ink';
       selection.index = index;
-      modifyPanel(index, () => ({ name, ...image, markers: [], barriers: [], traced: false }));
-      state = { ...state, demo: false };
+      const panels = state.panels.map((panel, i) => i === index ? { name, ...image, markers: [], barriers: [], traced: false } : panel);
+      state = { ...state, panels, roles: referencedRoles(panels), demo: false };
+      render();
       report('原稿を差し替えました。ペンと描画設定を引き継いでいます。');
     });
   };
@@ -1075,23 +1111,39 @@
     }
     remember();
     closeReplay();
-    splitStart = null;
-    state = { ...state, name: isDemo ? '新しい原稿' : state.name, demo: false, panels: [...current, ...panels] };
+    clearExport();
+    state = { ...state, name: isDemo ? '新しい原稿' : state.name, demo: false,
+      roles: isDemo ? [] : state.roles, panels: [...current, ...panels] };
     selection.index = current.length;
-    selection.view = 'compare';
+    selection.view = 'ink';
     render();
+    setImportFeedback();
     report(panels.length + '枚を読み込みました。「トレスする」で処理を開始します。');
   });
   $('export').onclick = () => {
-    const panel = state.panels[selection.index];
+    const target = exportSelection;
+    if (!target) return;
+    const { panel, mode } = target;
     const type = $('export-type').value;
-    output(panel, type).toBlob(blob => {
-      if (!blob) return report('PNGを作成できませんでした。');
-      download(blob, panel.name + '-' + type + '.png');
-      report('PNGのダウンロードを開始しました。');
-    }, 'image/png');
+    if ($('export-type').selectedOptions[0]?.disabled) return;
+    try {
+      if (type === 'psd') return savePsd(panel, mode);
+      if (type === 'svg' || type === 'json') return saveVector(type, panel, mode);
+      output(panel, mode).toBlob(blob => {
+        if (blob) {
+          if (exportSelection === target) downloadExport(blob, panel.name + '-' + mode + '.png');
+          else download(blob, panel.name + '-' + mode + '.png');
+        } else if (exportSelection === target) {
+          $('export-status').textContent = 'PNGを作成できませんでした。';
+        }
+      }, 'image/png');
+    } catch (error) {
+      $('export-status').textContent = 'ファイルを作成できませんでした。もう一度お試しください。';
+      console.error(error);
+    }
   };
-  $('export-type').onchange = () => { $('export').disabled = !state.panels[selection.index].traced && $('export-type').value !== 'source'; };
+  $('export-type').onchange = () => { $('export-status').textContent = ''; };
+  $('close-export').onclick = closeExport;
   const surfaces = [...document.querySelectorAll('header, main')];
   surfaces.forEach(element => { element.inert = true; });
   startDemo().catch(demoFailed).finally(() => surfaces.forEach(element => { element.inert = false; }));
