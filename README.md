@@ -7,7 +7,7 @@
 
 Watch a pen retrace the lines in an illustration. On a color original, a brush then applies colors sampled from the same image. When the drawing ends, the workspace puts the original beside the reconstructed result. / イラストを読み込み、ペン先が元絵をなぞって線を引き直すところを見られます。カラー原稿ではその後、筆が元絵から拾った色を塗ります。工程が終わると、作業画面に元絵とトレス結果が並びます。
 
-Tracing and reconstruction run in the browser. The drawing is processed using image analysis, and it is never sent to an AI service. No API key or AI subscription is required. / トレスと元色の復元はブラウザー内の画像処理で行います。原稿は外部サービスへ送信されず、生成AIサービスへの登録やAPIキーも不要です。
+The browser runs the entire drawing pipeline locally with explicit algorithms and equations. Line extraction, pen effects, color reconstruction, and replay use no AI model or inference API. No API key or AI subscription is required, and the input image stays in the browser. / 線の抽出、ペンタッチ、元色の復元、描画の再生まで、すべてブラウザー内でアルゴリズムと数式を使って処理します。描画ルーチンにAIモデルや推論APIは使いません。原稿の外部送信、AIサービスへの登録、APIキーは不要です。
 
 ![Color workspace with the original on the left and the traced result on the right / カラー作業画面、左に元絵、右にトレス結果](docs/assets/workspace-color.jpg)
 
@@ -59,6 +59,86 @@ The public X demo and the independent line-trace-strokes repository were concept
 [Technical report (EN)](docs/technical-paper-en.md) / [技術報告（日本語）](docs/technical-paper-ja.md)
 
 The system is intended for illustrations with identifiable ink and flat colors. It builds the replay order from the visible contours. Closely related hues can share a representative swatch. / 線とベタ色のあるイラスト向けです。再生順は画像から読み取った輪郭をもとに組み立てます。似た色は一つの代表色にまとめる場合があります。
+
+## Mathematics of the drawing pipeline / 描画ルーチンの数理
+
+The equations below describe the v0.1.3 implementation. AI-assisted development and the ImageGen sample artwork are part of the project's provenance. The drawing engine uses fixed numerical rules on the supplied raster and settings. / 以下はv0.1.3の実装に沿った数式です。開発ではAIのコーディング支援を、付属作例の制作ではImageGenを使いました。実行時のエンジンは、入力画像と設定に対してコードで定めた計算を行います。
+
+### 1. Pixel scores and thresholding / 画素のスコアと二値化
+
+For 8-bit channels $R,G,B,A$, set $a=A/255$. Compute a weighted RGB brightness $Y$ and channel spread $C$. The alpha terms treat transparency as white. / 8ビットのRGBA値に対し、白地に重ねたときの明るさ $Y$ と色の強さの指標 $C$ を計算します。完全透明なら $Y=255$、 $C=0$ です。
+
+$$
+\begin{aligned}
+Y&=\operatorname{round}\big(255+a(0.2126R+0.7152G+0.0722B-255)\big)\\
+C&=\operatorname{round}\big(a(\max(R,G,B)-\min(R,G,B))\big)
+\end{aligned}
+$$
+
+If the count of pixels with $C\ge18$ exceeds $\max(3,0.004WH)$ for width $W$ and height $H$, the color branch runs. Monochrome uses the score $D=Y$. For color, the code samples four opposing pairs around a pixel, along the horizontal, vertical, and two diagonals. Let $S$ be the maximum of the four pairwise minima. The difference $S-Y$ grows when at least one axis has brighter pixels on both sides of a dark line. / $C\ge18$ の画素数が $\max(3,0.004WH)$ を超えるとカラー処理に進みます。白黒の線スコアは $D=Y$ です。カラーでは水平・垂直・斜め2方向から対象画素を挟む点を取り、ペアごとの小さい明るさのうち最大の値を $S$ とします。少なくとも1方向で両側が明るい暗線ほど $S-Y$ が大きくなります。
+
+$$
+\begin{aligned}
+D_{\mathrm{dark}}&=2.1Y+4.2C+30\\
+D_{\mathrm{ridge}}&=222-2.7\max(0,S-Y)+0.9C+1.8\max(0,Y-112)\\
+D&=\left\lfloor\operatorname{clip}_{[0,255]}\big(\min(D_{\mathrm{dark}},D_{\mathrm{ridge}})\big)\right\rfloor
+\end{aligned}
+$$
+
+A pixel enters the ink mask when $D<\tau$, where the default threshold $\tau$ is 180. Either a low dark-pixel score or a low ridge score can bring a color pixel below the threshold. / しきい値 $\tau$ の初期値は180です。各画素を $D<\tau$ で判定し、カラーでは暗く色味が少ない画素や、周囲に対して細く暗く落ち込む画素が線の候補になります。 [engine.js](engine.js#L233-L271)
+
+### 2. Grid boundaries and even–odd filling / 格子の輪郭と偶奇則
+
+Treat every ink pixel as a unit square. Keep the directed edges that touch background or the image border, then link them into closed paths. At a corner shared only diagonally, the traversal prefers a right turn. Outer rings and hole rings run in opposite directions. At row $y$, intersect the paths with the line through pixel centers at height $y+\tfrac12$. If the sorted crossing coordinates are $x_1,\ldots,x_{2m}$, the ink intervals are
+
+$$
+[x_1,x_2)\ \cup\ [x_3,x_4)\ \cup\ \cdots\ \cup\ [x_{2m-1},x_{2m}).
+$$
+
+インク画素を単位正方形とし、背景や画像の外に接する辺を有向辺として残して閉経路を作ります。斜めに点で接する箇所では右折を優先し、外周と穴の周囲では経路の向きが逆になります。各行の画素の中心を通る走査線では、交点を左から数え、奇数番目で塗り始め、偶数番目で止めます。For crossings at 2, 5, 8 and 11, the result fills $[2,5)$ and $[8,11)$, leaving the middle open. / 交点が2、5、8、11なら、塗るのは $[2,5)$ と $[8,11)$ です。中央の穴が残ります。 [engine.js](engine.js#L81-L139)
+
+### 3. Local ink density and G-pen opacity / 局所インク密度とGペンの不透明度
+
+Let $B(x,y)=1-I(x,y)/255$ for the rebuilt ink value $I$. The engine builds a summed-area table $J(u,v)=\sum_{x<u,\,y<v}B(x,y)$. Four table lookups give the average ink density $s$ in the clipped window $[l,r)\times[t,b)$, with a radius of one to three pixels depending on image size. / 復元したインク値 $I$ を濃さ $B$ に変換し、二次元の累積和を作ります。画像の大きさに応じた半径1〜3画素の近傍について、累積和の四隅だけで平均インク密度 $s$ が求まります。
+
+$$
+s=\frac{J(r,b)-J(l,b)-J(r,t)+J(l,t)}{(r-l)(b-t)}.
+$$
+
+For a pixel with ink opacity $\alpha=B(x,y)$ and strength $g$ equal to the G-pen slider percentage divided by 100, the output opacity is $\alpha'$. / Gペンでは、元の不透明度 $\alpha$ に密度から求めた係数 $q$ を掛けます。インクの周りにも、密度に応じて濃さを足します。強さ $g$ はスライダーの百分率を100で割った値です。
+
+$$
+\begin{aligned}
+q&=0.27+0.73\operatorname{clip}_{[0,1]}\big((s-0.22)/0.41\big)\\
+h&=\alpha q+(1-\alpha)\min(0.68,\,2.15\max(0,s-0.19))\\
+\alpha'&=\alpha+g(h-\alpha)
+\end{aligned}
+$$
+
+Sparse ink is softened, while dense neighborhoods retain stronger ink and can darken adjacent pixels. This gives the pen its thin and heavy areas through local density. / 周囲のインクが少ない先端などは薄くなり、密度の高い場所は濃さを保ち、周りにもインクが広がります。 [engine.js](engine.js#L191-L231)
+
+### 4. RGB quantization and connected regions / RGBの量子化と連結領域
+
+The color pass builds a histogram with 5 bits per channel. It considers histogram bins in descending frequency, uses their mean RGBs as candidates, skips candidates within RGB distance 25 of an accepted color, and keeps up to 34 swatches. A pixel's bin is assigned by the squared Euclidean distance from its representative point $b$, computed as $8\lfloor v/8\rfloor+4$ for each channel $v$, to each swatch $c_j$. / 色ごとにRGBの各チャンネルを8刻みで区切り、出現頻度順に各区画の平均色を候補にします。採用済みの色からRGB距離25未満の色は飛ばし、最大34色を採ります。画素はRGB空間で区画の代表点 $b$ から一番近い色 $c_j$ に割り当てます。
+
+$$
+k(b)=\operatorname*{arg\,min}_j\sum_{i\in\{R,G,B\}}(b_i-c_{j,i})^2.
+$$
+
+Treat non-ink pixels as vertices of a grid graph. An edge joins horizontal or vertical neighbors of the same color class. Breadth-first search labels each connected component. The assignment preserves separate regions when the same color appears in disconnected parts of an illustration. / 線や境界で遮られず、同じ色クラスの画素が上下左右でつながる範囲を、幅優先探索で領域に分けます。同じ色でも離れたパーツには別々の領域番号が付きます。 [Palette / 代表色](engine.js#L273-L322) · [Regions / 領域](engine.js#L19-L56)
+
+### 5. Pen and brush timing / ペンと筆の時間配分
+
+During replay, contours run from longest to shortest. A contour of perimeter $L$ receives a time window proportional to $w(L)=L^{0.82}$, multiplied by $0.17$ when $L\le8$. For contour $i$, a point at distance $d$ along its path seeds an ink reveal time $T_i(d)$. The 4-neighbor queue propagates these times inward, adding $0.002$ per step and capping at 1. / 再生時は周長の長い輪郭から回ります。輪郭 $i$ の開始時刻を先行する輪郭の持ち時間の合計として、輪郭上の距離 $d$ に比例してインクの表示時刻を割り当てます。近接するインク画素へ上下左右に伝え、1歩ごとに $0.002$ を足します。時刻の上限は1です。
+
+$$
+T_i(d)=\frac{\sum_{j<i}w(L_j)}{\sum_j w(L_j)}
+       +\frac{d}{L_i}\frac{w(L_i)}{\sum_j w(L_j)}.
+$$
+
+In the color phase, a color layer of area $A_j$ pixels receives a fraction $\sqrt{A_j}/\sum_k\sqrt{A_k}$ of the paint time. Its bounding box is divided into five horizontal bands. In band $b=0,\ldots,4$, let $u$ be the normalized horizontal position across the box. The fraction within the layer's window is $(b+u)/5$ in even bands and $(b+1-u)/5$ in odd bands. Only assigned pixels get a paint time. / 彩色では、色レイヤーごとの画素数 $A_j$ の平方根で持ち時間を配分します。外接矩形を横に5帯に分け、帯番号 $b$ が偶数なら左から右、奇数なら右から左へ進みます。色が割り当てられた画素だけに時刻を付けるので、筆が往復する帯でも領域の外には色が広がりません。
+
+The contour and color schedules reconstruct a plausible drawing process from a still image. A raster by itself provides no record of the artist's original stroke order or pen pressure. / この時間割は完成画像から再生用に組み立てたものです。元の作者の筆順や筆圧の記録は、静止画像に含まれていません。 [Ink timeline / 線の時刻](engine.js#L141-L189) · [Replay and color timing / 再生と彩色の時刻](app.js#L649-L754)
 
 ## MCP
 
