@@ -1,4 +1,4 @@
-# AI Tracer Nazori-kun v0.1.2 Technical Report
+# AI Tracer Nazori-kun v0.1.3 Technical Report
 
 November 25, 2026 · FURU
 
@@ -37,3 +37,5 @@ A public demonstration on X and a separate public repository were concept refere
 - [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 
 Version 0.1.2 updates the user documentation. The tracing, coloring, and export pipelines match v0.1.1. The application header opens the PDF covering operation and API settings.
+
+Version 0.1.3 adapts the header controls to the available width. Image import, project actions, and the manual retain their own controls.

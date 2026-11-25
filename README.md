@@ -75,3 +75,34 @@ Independent engine tests / エンジンの単体検証
 ```text
 node --test engine.test.cjs
 ```
+
+## AI Manga Creative Suite applications / 関連アプリ・プラグイン
+
+| Application / アプリ | Use / 用途 | Links / リンク |
+| --- | --- | --- |
+| Super FURU AI 4-koma System | Create single-page and multipage manga. / 1ページ・複数ページ漫画を制作します。 | [Web](https://furuyan1234.github.io/nano-banana-pro/) · [GitHub](https://github.com/FURUYAN1234/nano-banana-pro) · [Guide / 解説](https://note.com/happy_duck780/n/ndf063558c1f5) |
+| AI Story Maker | Build a plot from a topic. / お題からストーリーやプロットを組み立てます。 | [Web](https://furuyan1234.github.io/story-maker/) · [GitHub](https://github.com/FURUYAN1234/story-maker) · [Guide / 解説](https://note.com/happy_duck780/n/nd3d972922868) |
+| AI Character Sheet Maker | Create character reference sheets. / キャラクターの設定画を作ります。 | [Web](https://furuyan1234.github.io/character-sheet-maker/) · [GitHub](https://github.com/FURUYAN1234/character-sheet-maker) · [Guide / 解説](https://note.com/happy_duck780/n/neccbebd7d957) |
+| AI Comic Translation Tool / AI漫画翻訳ツール | Translate manga and review the translated text. / 漫画の翻訳文を確認・編集して、翻訳画像を生成します。 | [Web](https://furuyan1234.github.io/comic-translation/) · [GitHub](https://github.com/FURUYAN1234/comic-translation) · [Guide / 解説](https://note.com/happy_duck780/n/ne462dfc55ec8) |
+| PanoForge / 360° AI Panorama Generator | Build and explore a 360° panorama from one image. / 一枚の画像から360度パノラマを作成し、構図を探せます。 | [Web](https://furuyan1234.github.io/panoforge/) · [GitHub](https://github.com/FURUYAN1234/panoforge) · [Guide / 解説](https://note.com/happy_duck780/n/nb53b121fef88) |
+| AI Voice Comic Maker | Turn comic panels into voiced videos. / 4コマ漫画を声とカメラ演出付きの動画にします。 | [GitHub / 配布](https://github.com/FURUYAN1234/ai-voice-comic-maker) · [Guide / 解説](https://note.com/happy_duck780/n/ndc6533c1512f) |
+| Monogatari Buzz Maker / 物語バズメーカー | Use public topics as material for comics, videos, or fiction. / 公開WebやRSSの話題を漫画・動画・小説の企画にまとめます。 | [Web](https://furuyan1234.github.io/viral-radar/) · [GitHub](https://github.com/FURUYAN1234/viral-radar) · [Guide / 解説](https://note.com/happy_duck780/n/ncc593101d77f) |
+| Narrated Video Maker / ナレーション動画メーカー | Make videos with Japanese narration and subtitles. / 日本語のナレーション・字幕・映像を合わせて動画を作ります。 | [GitHub / 配布](https://github.com/FURUYAN1234/gemini-narration-studio) · [Guide / 解説](https://note.com/happy_duck780/n/n97d49c1c98b1) |
+| AI Image Bridge | Edit CLIP STUDIO PAINT EX layers from text prompts. / CLIP STUDIO PAINT EXのレイヤーを文章の指示で編集します。 | [GitHub / 配布](https://github.com/FURUYAN1234/ai-image-bridge) · [Guide / 解説](https://note.com/happy_duck780/n/n6747a089fce7) |
+
+## ComfyUI workflows / ComfyUIワークフロー
+
+| Workflow / ワークフロー | Use / 用途 | Links / リンク |
+| --- | --- | --- |
+| MiniMax H3 Video | Generate videos with sound from text, a starting image, or references. / 文章・開始画像・参照画像から音声付き動画を作ります。 | [GitHub](https://github.com/FURUYAN1234/comfyui-h3-workflows) · [Guide / 解説](https://note.com/happy_duck780/n/n15e732b3147b) |
+| MiniMax H3 MV | Make a music video from an existing song. / 完成した楽曲からミュージックビデオを作ります。 | [GitHub](https://github.com/FURUYAN1234/comfyui-h3-workflows) · [Guide / 解説](https://note.com/happy_duck780/n/ne8a84cb6db37) |
+| KomaOrbit | Explore viewpoints in 3D from one illustration. / 一枚のイラストから別の視点や構図を探します。 | [GitHub](https://github.com/FURUYAN1234/comfyui-h3-workflows) · [Guide / 解説](https://note.com/happy_duck780/n/n3f68482d5edd) |
+| AnimeSharp Long Video Upscaler / 長尺動画アップスケーラー | Upscale long videos while retaining sound. / 元の音声を引き継ぎながら長尺動画を拡大します。 | [GitHub](https://github.com/FURUYAN1234/comfyui-long-video-upscaler) · [Guide / 解説](https://note.com/happy_duck780/n/n0f190160e307) |
+| Japanese Songwriting with YuE2 / 日本語おまかせ作曲 | Generate lyrics and songs from Japanese instructions. / 日本語の指示から歌詞と歌を作ります。 | [GitHub](https://github.com/FURUYAN1234/ComfyUI-YuE2-Japanese) · [Guide / 解説](https://note.com/happy_duck780/n/n57df44cf7fd2) |
+| Japanese Narration / 日本語おまかせナレーション | Review readings and synthesize narration. / 読みを確認して日本語のナレーションを作ります。 | [GitHub](https://github.com/FURUYAN1234/ComfyUI-Local-Narration-Japanese) · [Guide / 解説](https://note.com/happy_duck780/n/nda7ed302d544) |
+| MangaScreen JP | Convert images into manga line art, solids, and screentones. / 画像を漫画向けの線画・ベタ・網点に仕上げます。 | [GitHub](https://github.com/FURUYAN1234/ComfyUI-MangaScreen-JP) · [Guide / 解説](https://note.com/happy_duck780/n/n5c89a250fb82) |
+
+### Companion tools / 補助ツール
+
+- **Codex Usage / Codex 残量** — A Windows overlay for usage and reset times. / 利用枠やリセット予定をWindows上に表示します。 [GitHub](https://github.com/FURUYAN1234/codex-usage-overlay)
+- **Local Handoff MCP** — Pass the current workspace and next steps between local coding agents. / CodexとAntigravityの間で作業フォルダーや次の工程を引き継ぎます。 [GitHub](https://github.com/FURUYAN1234/local-handoff-mcp) · [Guide / 解説](https://note.com/happy_duck780/n/n806c7bc6de94)
