@@ -68,22 +68,25 @@ The equations below describe the v0.1.3 implementation. AI-assisted development 
 
 For 8-bit channels $R,G,B,A$, set $a=A/255$. Compute a weighted RGB brightness $Y$ and channel spread $C$. The alpha terms treat transparency as white. / 8ビットのRGBA値に対し、白地に重ねたときの明るさ $Y$ と色の強さの指標 $C$ を計算します。完全透明なら $Y=255$、 $C=0$ です。
 
-$$
+```math
 \begin{aligned}
-Y&=\operatorname{round}\big(255+a(0.2126R+0.7152G+0.0722B-255)\big)\\
-C&=\operatorname{round}\big(a(\max(R,G,B)-\min(R,G,B))\big)
+Y&=\mathrm{round}\big(255+a(0.2126R+0.7152G+0.0722B-255)\big)\\
+C&=\mathrm{round}\big(a(\max(R,G,B)-\min(R,G,B))\big)
 \end{aligned}
-$$
+```
 
 If the count of pixels with $C\ge18$ exceeds $\max(3,0.004WH)$ for width $W$ and height $H$, the color branch runs. Monochrome uses the score $D=Y$. For color, the code samples four opposing pairs around a pixel, along the horizontal, vertical, and two diagonals. Let $S$ be the maximum of the four pairwise minima. The difference $S-Y$ grows when at least one axis has brighter pixels on both sides of a dark line. / $C\ge18$ の画素数が $\max(3,0.004WH)$ を超えるとカラー処理に進みます。白黒の線スコアは $D=Y$ です。カラーでは水平・垂直・斜め2方向から対象画素を挟む点を取り、ペアごとの小さい明るさのうち最大の値を $S$ とします。少なくとも1方向で両側が明るい暗線ほど $S-Y$ が大きくなります。
 
-$$
+```math
 \begin{aligned}
 D_{\mathrm{dark}}&=2.1Y+4.2C+30\\
-D_{\mathrm{ridge}}&=222-2.7\max(0,S-Y)+0.9C+1.8\max(0,Y-112)\\
-D&=\left\lfloor\operatorname{clip}_{[0,255]}\big(\min(D_{\mathrm{dark}},D_{\mathrm{ridge}})\big)\right\rfloor
+D_{\mathrm{ridge}}&=222-2.7\max(0,S-Y)\\
+&\quad+0.9C+1.8\max(0,Y-112)\\
+D&=\left\lfloor\mathrm{clip}_{[0,255]}\big(\min(D_{\mathrm{dark}},D_{\mathrm{ridge}})\big)\right\rfloor
 \end{aligned}
-$$
+```
+
+Here $\mathrm{clip}_{[l,r]}(z)=\min(r,\max(l,z))$. / $\mathrm{clip}$ は値を指定区間に収める処理です。
 
 A pixel enters the ink mask when $D<\tau$, where the default threshold $\tau$ is 180. Either a low dark-pixel score or a low ridge score can bring a color pixel below the threshold. / しきい値 $\tau$ の初期値は180です。各画素を $D<\tau$ で判定し、カラーでは暗く色味が少ない画素や、周囲に対して細く暗く落ち込む画素が線の候補になります。 [engine.js](engine.js#L233-L271)
 
@@ -91,9 +94,9 @@ A pixel enters the ink mask when $D<\tau$, where the default threshold $\tau$ is
 
 Treat every ink pixel as a unit square. Keep the directed edges that touch background or the image border, then link them into closed paths. At a corner shared only diagonally, the traversal prefers a right turn. Outer rings and hole rings run in opposite directions. At row $y$, intersect the paths with the line through pixel centers at height $y+\tfrac12$. If the sorted crossing coordinates are $x_1,\ldots,x_{2m}$, the ink intervals are
 
-$$
+```math
 [x_1,x_2)\ \cup\ [x_3,x_4)\ \cup\ \cdots\ \cup\ [x_{2m-1},x_{2m}).
-$$
+```
 
 インク画素を単位正方形とし、背景や画像の外に接する辺を有向辺として残して閉経路を作ります。斜めに点で接する箇所では右折を優先し、外周と穴の周囲では経路の向きが逆になります。各行の画素の中心を通る走査線では、交点を左から数え、奇数番目で塗り始め、偶数番目で止めます。For crossings at 2, 5, 8 and 11, the result fills $[2,5)$ and $[8,11)$, leaving the middle open. / 交点が2、5、8、11なら、塗るのは $[2,5)$ と $[8,11)$ です。中央の穴が残ります。 [engine.js](engine.js#L81-L139)
 
@@ -101,19 +104,19 @@ $$
 
 Let $B(x,y)=1-I(x,y)/255$ for the rebuilt ink value $I$. The engine builds a summed-area table $J(u,v)=\sum_{x<u,\,y<v}B(x,y)$. Four table lookups give the average ink density $s$ in the clipped window $[l,r)\times[t,b)$, with a radius of one to three pixels depending on image size. / 復元したインク値 $I$ を濃さ $B$ に変換し、二次元の累積和を作ります。画像の大きさに応じた半径1〜3画素の近傍について、累積和の四隅だけで平均インク密度 $s$ が求まります。
 
-$$
+```math
 s=\frac{J(r,b)-J(l,b)-J(r,t)+J(l,t)}{(r-l)(b-t)}.
-$$
+```
 
 For a pixel with ink opacity $\alpha=B(x,y)$ and strength $g$ equal to the G-pen slider percentage divided by 100, the output opacity is $\alpha'$. / Gペンでは、元の不透明度 $\alpha$ に密度から求めた係数 $q$ を掛けます。インクの周りにも、密度に応じて濃さを足します。強さ $g$ はスライダーの百分率を100で割った値です。
 
-$$
+```math
 \begin{aligned}
-q&=0.27+0.73\operatorname{clip}_{[0,1]}\big((s-0.22)/0.41\big)\\
+q&=0.27+0.73\mathrm{clip}_{[0,1]}\big((s-0.22)/0.41\big)\\
 h&=\alpha q+(1-\alpha)\min(0.68,\,2.15\max(0,s-0.19))\\
 \alpha'&=\alpha+g(h-\alpha)
 \end{aligned}
-$$
+```
 
 Sparse ink is softened, while dense neighborhoods retain stronger ink and can darken adjacent pixels. This gives the pen its thin and heavy areas through local density. / 周囲のインクが少ない先端などは薄くなり、密度の高い場所は濃さを保ち、周りにもインクが広がります。 [engine.js](engine.js#L191-L231)
 
@@ -121,9 +124,9 @@ Sparse ink is softened, while dense neighborhoods retain stronger ink and can da
 
 The color pass builds a histogram with 5 bits per channel. It considers histogram bins in descending frequency, uses their mean RGBs as candidates, skips candidates within RGB distance 25 of an accepted color, and keeps up to 34 swatches. A pixel's bin is assigned by the squared Euclidean distance from its representative point $b$, computed as $8\lfloor v/8\rfloor+4$ for each channel $v$, to each swatch $c_j$. / 色ごとにRGBの各チャンネルを8刻みで区切り、出現頻度順に各区画の平均色を候補にします。採用済みの色からRGB距離25未満の色は飛ばし、最大34色を採ります。画素はRGB空間で区画の代表点 $b$ から一番近い色 $c_j$ に割り当てます。
 
-$$
-k(b)=\operatorname*{arg\,min}_j\sum_{i\in\{R,G,B\}}(b_i-c_{j,i})^2.
-$$
+```math
+d_j^2=(b_R-c_{j,R})^2+(b_G-c_{j,G})^2+(b_B-c_{j,B})^2.
+```
 
 Treat non-ink pixels as vertices of a grid graph. An edge joins horizontal or vertical neighbors of the same color class. Breadth-first search labels each connected component. The assignment preserves separate regions when the same color appears in disconnected parts of an illustration. / 線や境界で遮られず、同じ色クラスの画素が上下左右でつながる範囲を、幅優先探索で領域に分けます。同じ色でも離れたパーツには別々の領域番号が付きます。 [Palette / 代表色](engine.js#L273-L322) · [Regions / 領域](engine.js#L19-L56)
 
@@ -131,10 +134,10 @@ Treat non-ink pixels as vertices of a grid graph. An edge joins horizontal or ve
 
 During replay, contours run from longest to shortest. A contour of perimeter $L$ receives a time window proportional to $w(L)=L^{0.82}$, multiplied by $0.17$ when $L\le8$. For contour $i$, a point at distance $d$ along its path seeds an ink reveal time $T_i(d)$. The 4-neighbor queue propagates these times inward, adding $0.002$ per step and capping at 1. / 再生時は周長の長い輪郭から回ります。輪郭 $i$ の開始時刻を先行する輪郭の持ち時間の合計として、輪郭上の距離 $d$ に比例してインクの表示時刻を割り当てます。近接するインク画素へ上下左右に伝え、1歩ごとに $0.002$ を足します。時刻の上限は1です。
 
-$$
-T_i(d)=\frac{\sum_{j<i}w(L_j)}{\sum_j w(L_j)}
+```math
+T_i(d)=\frac{\sum_{j=1}^{i-1}w(L_j)}{\sum_j w(L_j)}
        +\frac{d}{L_i}\frac{w(L_i)}{\sum_j w(L_j)}.
-$$
+```
 
 In the color phase, a color layer of area $A_j$ pixels receives a fraction $\sqrt{A_j}/\sum_k\sqrt{A_k}$ of the paint time. Its bounding box is divided into five horizontal bands. In band $b=0,\ldots,4$, let $u$ be the normalized horizontal position across the box. The fraction within the layer's window is $(b+u)/5$ in even bands and $(b+1-u)/5$ in odd bands. Only assigned pixels get a paint time. / 彩色では、色レイヤーごとの画素数 $A_j$ の平方根で持ち時間を配分します。外接矩形を横に5帯に分け、帯番号 $b$ が偶数なら左から右、奇数なら右から左へ進みます。色が割り当てられた画素だけに時刻を付けるので、筆が往復する帯でも領域の外には色が広がりません。
 
