@@ -16,7 +16,7 @@
     }
   }
 
-  function segment({ width, height, ink, colorClasses, palette }, threshold, barriers = []) {
+  function segment({ width, height, ink, colorClasses, palette }, threshold, barriers = [], regionLimit = Infinity) {
     const labels = new Int32Array(ink.length);
     const queue = new Int32Array(ink.length);
     const regions = [];
@@ -26,6 +26,7 @@
     for (const barrier of barriers) drawBarrier(labels, width, height, barrier);
     for (let index = 0; index < labels.length; index++) {
       if (labels[index] !== 0) continue;
+      if (regions.length >= regionLimit) throw new Error('塗り分けが複雑なため、プレビュー寸法で保存してください。');
       const id = regions.length + 1;
       let size = 0;
       let touchesEdge = false;
@@ -78,19 +79,21 @@
     return colors;
   }
 
-  function traceInk({ width, height, ink }, threshold) {
+  function traceInk({ width, height, ink }, threshold, edgeLimit = Infinity) {
     const stride = width + 1;
     const edges = new Uint8Array(stride * (height + 1));
     const offsets = [1, stride, -1, -stride];
+    let remaining = edgeLimit;
     // Follow clockwise boundaries of black pixels, retaining the opposite winding of holes.
     for (let i = 0; i < ink.length; i++) {
       if (ink[i] >= threshold) continue;
       const x = i % width;
       const corner = Math.floor(i / width) * stride + x;
-      if (i < width || ink[i - width] >= threshold) edges[corner] |= 1;
-      if (x === width - 1 || ink[i + 1] >= threshold) edges[corner + 1] |= 2;
-      if (i >= ink.length - width || ink[i + width] >= threshold) edges[corner + stride + 1] |= 4;
-      if (x === 0 || ink[i - 1] >= threshold) edges[corner + stride] |= 8;
+      if (i < width || ink[i - width] >= threshold) { edges[corner] |= 1; remaining--; }
+      if (x === width - 1 || ink[i + 1] >= threshold) { edges[corner + 1] |= 2; remaining--; }
+      if (i >= ink.length - width || ink[i + width] >= threshold) { edges[corner + stride + 1] |= 4; remaining--; }
+      if (x === 0 || ink[i - 1] >= threshold) { edges[corner + stride] |= 8; remaining--; }
+      if (remaining < 0) throw new Error('輪郭が複雑なため、プレビュー寸法で保存してください。');
     }
     const contours = [];
     for (let start = 0; start < edges.length; start++) {
@@ -117,8 +120,8 @@
     return contours;
   }
 
-  function rebuildInk({ width, height, ink }, threshold) {
-    const contours = traceInk({ width, height, ink }, threshold);
+  function rebuildInk({ width, height, ink }, threshold, edgeLimit) {
+    const contours = traceInk({ width, height, ink }, threshold, edgeLimit);
     const rebuilt = new Uint8Array(ink.length).fill(255);
     const crossings = Array.from({ length: height }, () => []);
     for (const { points } of contours) {
@@ -230,7 +233,7 @@
     return { ...image, ink: values };
   }
 
-  function inspectRaster(rgba, width, height) {
+  function inspectRaster(rgba, width, height, sourcePalette) {
     const count = width * height;
     const ink = new Uint8Array(count);
     const luminance = new Uint8Array(count);
@@ -266,7 +269,8 @@
         ink[i] = Math.min(255, Math.max(0, Math.min(black, ridge)));
       }
     }
-    const swatches = isColor ? detectSwatches(rgba, ink) : {};
+    const swatches = sourcePalette?.length ? classifySwatches(rgba, sourcePalette)
+      : isColor ? detectSwatches(rgba, ink) : {};
     return { width, height, ink, isColor, rgba, ...swatches };
   }
 
@@ -290,9 +294,6 @@
     }
     const peaks = [...histogram.values()].sort((a, b) => b[3] - a[3]);
     const palette = [];
-    function distance(r, g, b, color) {
-      return (r - color[0]) ** 2 + (g - color[1]) ** 2 + (b - color[2]) ** 2;
-    }
     for (const [rs, gs, bs, frequency] of peaks) {
       if (palette.length && frequency < Math.max(1, ink.length * .00009 / step)) break;
       const r = Math.round(rs / frequency), g = Math.round(gs / frequency), b = Math.round(bs / frequency);
@@ -300,15 +301,23 @@
       if (palette.length >= 34) break;
     }
     if (!palette.length) palette.push([255, 255, 255]);
+    return classifySwatches(rgba, palette);
+  }
+
+  function distance(r, g, b, color) {
+    return (r - color[0]) ** 2 + (g - color[1]) ** 2 + (b - color[2]) ** 2;
+  }
+
+  function classifySwatches(rgba, palette) {
     const lookup = new Uint8Array(32768).fill(255);
-    const colorClasses = new Uint8Array(ink.length);
-    for (let i = 0; i < ink.length; i++) {
+    const colorClasses = new Uint8Array(rgba.length / 4);
+    for (let i = 0; i < colorClasses.length; i++) {
       const k = i * 4;
       const a = rgba[k + 3] / 255;
       const r = Math.round(255 + (rgba[k] - 255) * a);
       const g = Math.round(255 + (rgba[k + 1] - 255) * a);
       const b = Math.round(255 + (rgba[k + 2] - 255) * a);
-      const bin = key(r, g, b);
+      const bin = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
       if (lookup[bin] === 255) {
         let best = Infinity;
         for (let j = 0; j < palette.length; j++) {
@@ -390,7 +399,7 @@
     return out;
   }
 
-  function makeLayers(inkImage, layout, assignments, roles) {
+  function makeLayers(inkImage, layout, assignments, roles, byteLimit = Infinity) {
     const { width, height, ink } = inkImage;
     const pen = new Uint8ClampedArray(4 * ink.length);
     const paper = new Uint8ClampedArray(pen.length).fill(255);
@@ -413,9 +422,14 @@
       s.right = Math.max(s.right, x + 1); s.bottom = Math.max(s.bottom, y + 1);
       swatchAt[i] = index;
     }
+    let bytes = pen.length + paper.length;
     for (const s of swatches) {
       s.width = s.right - s.left;
       s.height = s.bottom - s.top;
+      bytes += 4 * s.width * s.height;
+    }
+    if (bytes > byteLimit) throw new Error('色レイヤーが大きいため、プレビュー寸法で保存してください。');
+    for (const s of swatches) {
       s.pixels = new Uint8ClampedArray(4 * s.width * s.height);
     }
     for (let i = 0; i < swatchAt.length; i++) {
@@ -434,14 +448,15 @@
     ];
   }
 
-  function makeSvg({ width, height }, contours, layers) {
+  function makeSvg({ width, height }, contours, layers, edgeLimit = Infinity) {
     function paths(shapes) {
       return shapes.map(({ points }) => 'M' + points.map(([x, y]) => x + ' ' + y).join('L') + 'Z').join('');
     }
     const parts = layers.filter(layer => layer.hex).map((layer, i) => {
       const ink = new Uint8Array(layer.width * layer.height);
       for (let j = 0; j < ink.length; j++) ink[j] = 255 - layer.pixels[j * 4 + 3];
-      const boundaries = traceInk({ width: layer.width, height: layer.height, ink }, 128);
+      const boundaries = traceInk({ width: layer.width, height: layer.height, ink }, 128, edgeLimit);
+      edgeLimit -= boundaries.reduce((total, contour) => total + contour.length, 0);
       const visibility = layer.hidden ? ' display="none"' : '';
       return '<path id="color-' + (i + 1) + '" fill="' + layer.hex + '" d="' + paths(boundaries)
         + '" transform="translate(' + layer.left + ' ' + layer.top + ')"' + visibility + '/>';
