@@ -1,6 +1,7 @@
 # AI Tracer Nazori-kun / AIトレーサー なぞり君
 
 [![Open the web app / Webアプリを開く](docs/assets/button-open.png)](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
+<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.4.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.4 source ZIP / v0.1.4のソースZIPをダウンロード" width="232" height="53"></a>
 [![Download the manual PDF / 操作マニュアルPDFをダウンロード](docs/assets/button-manual.png)](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases/latest/download/nazori-kun-manual.pdf)
 
 [v0.1.4 walkthrough (YouTube) / v0.1.4の操作動画（YouTube）](https://youtu.be/Zf8ESjz5FSs) · [Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
@@ -8,6 +9,23 @@
 Watch a pen retrace the lines in an illustration. On a color original, a brush then applies colors sampled from the same image. When the drawing ends, the workspace puts the original beside the reconstructed result. / イラストを読み込み、ペン先が元絵をなぞって線を引き直すところを見られます。カラー原稿ではその後、筆が元絵から拾った色を塗ります。工程が終わると、作業画面に元絵とトレス結果が並びます。
 
 The browser runs the entire drawing pipeline locally with explicit algorithms and equations. Line extraction, pen effects, color reconstruction, and replay use no AI model or inference API. No API key or AI subscription is required, and the input image stays in the browser. / 線の抽出、ペンタッチ、元色の復元、描画の再生まで、すべてブラウザー内でアルゴリズムと数式を使って処理します。描画ルーチンにAIモデルや推論APIは使いません。原稿の外部送信、AIサービスへの登録、APIキーは不要です。
+
+## Download and run locally / ZIPをダウンロードしてローカルで使う
+
+You need Node.js 22.15 or later and Python 3. Use a local server to load the built-in samples and export at the original size. / Node.js 22.15以降とPython 3が必要です。付属作例の読み込みや元寸での保存が使えるよう、ローカルサーバーで起動します。
+
+1. [Download the v0.1.4 source ZIP / v0.1.4のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.4.zip) and extract it. / ZIPを保存して展開します。WindowsではZIPを右クリックし、**すべて展開** を選びます。
+2. Open a terminal in the extracted folder that contains `package.json`. On Windows, you can open that folder in File Explorer, type `cmd` in the address bar, and press Enter. / 展開したフォルダーのうち、`package.json` がある場所でターミナルを開きます。Windowsならエクスプローラーのアドレスバーに `cmd` と入力して Enter を押します。
+3. Build the app and start the local server. Run the commands one at a time. / 下のコマンドを1行ずつ入力し、アプリのビルドとローカルサーバーの起動を行います。
+
+   ```shell
+   npm run build
+   py -3 -m http.server 8000 --bind 127.0.0.1 --directory dist
+   ```
+
+   On macOS or Linux, use `python3` in place of `py -3`. On Windows, `python` also works if it launches Python 3. / macOS・Linuxでは `py -3` を `python3` に置き換えます。Windowsでも `python` でPython 3を起動できる場合は、`python` に置き換えられます。
+
+4. Leave the terminal open. In your browser, enter `http://127.0.0.1:8000/` and click **トレスする** (Trace) on the sample. To stop the server, press Ctrl+C in the terminal. / ターミナルを開いたまま、ブラウザーのアドレスバーに `http://127.0.0.1:8000/` を入力します。作例が表示されたら **トレスする** を押します。終了するときは、ターミナルで Ctrl+C を押します。
 
 ![Color workspace with the original on the left and the traced result on the right / カラー作業画面、左に元絵、右にトレス結果](docs/assets/workspace-color.jpg)
 
