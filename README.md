@@ -213,3 +213,9 @@ node --test engine.test.cjs
 
 - **Codex Usage / Codex 残量** — A Windows overlay for usage and reset times. / 利用枠やリセット予定をWindows上に表示します。 [GitHub](https://github.com/FURUYAN1234/codex-usage-overlay) · [Guide / 解説](https://note.com/happy_duck780/n/n98e53f17d74a)
 - **Local Handoff MCP** — Pass the current workspace and next steps between local coding agents. / CodexとAntigravityの間で作業フォルダーや次の工程を引き継ぎます。 [GitHub](https://github.com/FURUYAN1234/local-handoff-mcp) · [Guide / 解説](https://note.com/happy_duck780/n/n806c7bc6de94)
+
+## CLIP Drop / 習作・ベータ版
+
+クリスタの .clip を SVG・PSD・PNG に変換するWindows用の習作です。 / An experimental Windows converter for Clip Studio Paint files.
+
+- [GitHub](https://github.com/FURUYAN1234/clip-drop) · [note](https://note.com/happy_duck780/n/n8a38199a75db)
