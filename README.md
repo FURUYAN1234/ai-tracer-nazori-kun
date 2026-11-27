@@ -1,7 +1,7 @@
 # AI Tracer Nazori-kun / AIトレーサー なぞり君
 
 [![Open the web app / Webアプリを開く](docs/assets/button-open.png)](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
-<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.4.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.4 source ZIP / v0.1.4のソースZIPをダウンロード" width="232" height="53"></a>
+<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.5.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.5 source ZIP / v0.1.5のソースZIPをダウンロード" width="232" height="53"></a>
 [![Download the manual PDF / 操作マニュアルPDFをダウンロード](docs/assets/button-manual.png)](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases/latest/download/nazori-kun-manual.pdf)
 
 [v0.1.4 walkthrough (YouTube) / v0.1.4の操作動画（YouTube）](https://youtu.be/Zf8ESjz5FSs) · [Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
@@ -14,7 +14,7 @@ The browser runs the entire drawing pipeline locally with explicit algorithms an
 
 You need Node.js 22.15 or later and Python 3. Use a local server to load the built-in samples and export at the original size. / Node.js 22.15以降とPython 3が必要です。付属作例の読み込みや元寸での保存が使えるよう、ローカルサーバーで起動します。
 
-1. [Download the v0.1.4 source ZIP / v0.1.4のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.4.zip) and extract it. / ZIPを保存して展開します。WindowsではZIPを右クリックし、**すべて展開** を選びます。
+1. [Download the v0.1.5 source ZIP / v0.1.5のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.5.zip) and extract it. / ZIPを保存して展開します。WindowsではZIPを右クリックし、**すべて展開** を選びます。
 2. Open a terminal in the extracted folder that contains `package.json`. On Windows, you can open that folder in File Explorer, type `cmd` in the address bar, and press Enter. / 展開したフォルダーのうち、`package.json` がある場所でターミナルを開きます。Windowsならエクスプローラーのアドレスバーに `cmd` と入力して Enter を押します。
 3. Build the app and start the local server. Run the commands one at a time. / 下のコマンドを1行ずつ入力し、アプリのビルドとローカルサーバーの起動を行います。
 
@@ -43,7 +43,9 @@ Choose G-pen, round pen, brush pen, or the extracted outline under **ペンタ�
 
 **描画速度** sets the speed of the initial trace. **工程を再生** plays the sequence from the beginning. Pause or seek with the timeline, and change **再生速度** independently. **動画を保存** exports the replay as WebM when the browser provides a supported encoder. / **描画速度** はトレス時の速さです。**工程を再生** で最初から見直せます。一時停止やシークバーで途中へ移動し、**再生速度** を別に調整できます。対応ブラウザーでは **動画を保存** からWebMに保存できます。
 
-![The brush moving across the color original during replay / 再生中、筆先が動きながら色を置いている場面](docs/assets/drawing-replay.jpg)
+The replay monitor follows the pen or brush tip in a magnified view. During tracing it shows the current coordinates, outline and recorded-point counts, and estimated ink width. During coloring, it shows the current color, target pixel count, and progress. Use **計器を隠す** to collapse it. / 再生中はモニターがペン先や筆先を拡大表示します。トレス中は座標・輪郭数・記録点数・推定線幅、彩色中は塗っている色・対象画素数・進捗が見られます。**計器を隠す** で折り畳めます。
+
+![The coloring replay and its brush-tip monitor / 彩色工程と筆先を拡大した彩色モニター](docs/assets/drawing-replay.jpg)
 
 For a color result, select a palette swatch, choose a replacement color, and click **適用**. Regions sharing that color layer change together. **配色 AとBを比べる** previews two alternatives. **元に戻す** and **やり直す** can restore changes. / カラー結果の色チップを開き、色を選んで **適用** を押すと、その色レイヤーに入っている箇所が変わります。**配色 AとBを比べる** で二つの配色を見比べることができます。色の変更は **元に戻す**・**やり直す** に対応します。
 

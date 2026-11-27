@@ -167,6 +167,48 @@ button[aria-pressed='true'] { background: var(--sheet); border-color: var(--line
 .timeline { gap: 9px; padding-top: 8px; font-size: 12px; flex-wrap: wrap; }
 #scrub { flex: 1; min-width: 70px; }
 #phase { min-width: 56px; }
+#trace-monitor {
+  --monitor-bg: #33263c;
+  --monitor-text: #fff5fb;
+  --monitor-muted: #dec9df;
+  --monitor-line: #635269;
+  min-width: 0; margin-top: 8px; padding: 12px; border-radius: 8px;
+  background: var(--monitor-bg); color: var(--monitor-text); font-size: 12px;
+}
+.trace-monitor-header { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-bottom: 8px; }
+.trace-monitor-header h2 { margin: 0; font-size: 14px; }
+#trace-monitor-state { flex: none; color: var(--monitor-muted); font-weight: 700; letter-spacing: .07em; }
+#trace-monitor[data-live] #trace-monitor-state { color: #ffc3ad; animation: trace-signal 1.35s steps(1) infinite; }
+#trace-monitor[data-painting] [data-monitor-trace], #trace-monitor:not([data-painting]) [data-monitor-paint] { display: none; }
+@keyframes trace-signal { 50% { color: #fff5fb; } }
+.trace-scope { position: relative; overflow: hidden; border-radius: 4px; background: #fbf6fa; color: var(--ink); }
+#trace-zoom { display: block; width: 100%; height: auto; }
+.trace-scope:has(#trace-zoom-hint[hidden])::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(#8043764a, #8043764a) center / 1px 100% no-repeat,
+    linear-gradient(#8043764a, #8043764a) center / 100% 1px no-repeat;
+}
+#trace-zoom-hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+.trace-zoom-label { position: absolute; left: 6px; top: 6px; padding: 1px 5px; border-radius: 3px; background: var(--monitor-bg); color: var(--monitor-text); font-size: 10px; }
+.trace-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 10px; margin: 8px 0; }
+.trace-readout > div { padding: 4px 0; border-bottom: 1px solid var(--monitor-line); }
+.trace-readout dt, .trace-progress label { color: var(--monitor-muted); font-size: 11px; }
+.trace-readout dd, .trace-progress > span { margin: 0; font: 600 12px/1.5 ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.trace-readout > div:nth-child(-n+4) dd { font-size: 14px; }
+.trace-readout dd small { display: block; color: var(--monitor-muted); font-size: 10px; }
+.trace-color { display: flex; align-items: center; gap: 6px; }
+#trace-color-chip { width: 13px; height: 13px; flex: none; border: 1px solid var(--monitor-muted); border-radius: 3px; }
+.trace-progress { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 8px; }
+.trace-progress progress { grid-column: 1 / -1; width: 100%; height: 5px; accent-color: #f2a78e; }
+.trace-method { margin: 10px 0 0; font-size: 11px; color: var(--monitor-muted); }
+.trace-method strong { color: var(--monitor-text); }
+@media (min-width: 1120px) {
+  .replay:has(#trace-monitor:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) 254px; gap: 8px; align-items: start; }
+  #trace-monitor { margin-top: 0; }
+}
+@media (max-width: 740px) {
+  .replay:has(#trace-monitor:not([hidden])) #movie { max-height: min(42svh, 420px); }
+}
 footer { border-top: 1px solid var(--line); color: var(--muted); padding: 12px clamp(16px, 4vw, 64px); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; font-size: 12px; }
 #status { color: var(--ink); overflow-wrap: anywhere; }
 @media (max-width: 740px) { .toolbar { flex-basis: 100%; } #import { margin-inline: auto 0; } }
@@ -174,4 +216,7 @@ footer { border-top: 1px solid var(--line); color: var(--muted); padding: 12px c
 @media (max-width: 740px) { main, .preview-layout { grid-template-columns: minmax(0, 1fr); } .inspector { width: 100%; } .headline { margin-bottom: 16px; flex-wrap: wrap; } .source-menu > div { position: static; white-space: normal; } #export-image canvas { max-height: 51vh; } }
 @media (max-width: 540px) { .brand { font-size: 14px; gap: 7px; } #import { padding-inline: .7em; font-size: 14px; } .toolbar { justify-content: flex-start; font-size: 12px; } .toolbar :is(button, .manual-link) { padding-inline: .62em; } }
 @media (max-width: 400px) { .stage-tools { font-size: 12px; } .play-button { padding: .65em .8em; font-size: 12px; } .art { padding: 4px; } .art figcaption { font-size: 11px; } .art figcaption small { font-size: 9px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+  #trace-monitor[data-live] #trace-monitor-state { animation: none; }
+}

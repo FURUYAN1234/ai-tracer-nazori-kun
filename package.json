@@ -1,6 +1,6 @@
 {
   "name": "ai-tracer-nazori-kun",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "AIトレーサー なぞり君 | Local perimeter-based inking and palette replay",
   "license": "MIT",

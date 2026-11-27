@@ -145,6 +145,23 @@
     return length ** .82 * (length <= 8 ? .17 : 1);
   }
 
+  function inkCrossSection({ width, height, ink }, edgeX, edgeY, dx, dy) {
+    const normalX = -dy, normalY = dx;
+    const insideX = Math.floor(edgeX + normalX * .5);
+    const insideY = Math.floor(edgeY + normalY * .5);
+    function scan(x, y, stepX, stepY) {
+      let count = 0;
+      while (x >= 0 && x < width && y >= 0 && y < height && ink[y * width + x] < 224) {
+        count++;
+        x += stepX;
+        y += stepY;
+      }
+      return count;
+    }
+    return scan(insideX, insideY, normalX, normalY)
+      + scan(insideX - normalX, insideY - normalY, -normalX, -normalY);
+  }
+
   function inkTimeline({ width, height, ink }, paths, total) {
     const time = new Float32Array(ink.length).fill(Infinity);
     const queue = new Int32Array(ink.length);
@@ -466,7 +483,7 @@
       + '</g><path id="pen" fill="black" fill-rule="nonzero" d="' + paths(contours) + '"/></svg>';
   }
 
-  const engine = { segment, regionAt, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, stylizeInk,
+  const engine = { segment, regionAt, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, inkCrossSection, stylizeInk,
     inspectRaster, sampleColors, swatchHex, makeLayers, makeSvg };
   if (typeof module !== 'undefined' && module.exports) module.exports = engine;
   else root.KomaEngine = engine;

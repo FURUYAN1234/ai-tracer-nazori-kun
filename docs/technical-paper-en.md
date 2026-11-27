@@ -1,4 +1,4 @@
-# AI Tracer Nazori-kun v0.1.4 Technical Report
+# AI Tracer Nazori-kun v0.1.5 Technical Report
 
 November 25, 2026 · FURU
 
@@ -18,6 +18,8 @@ AI assisted with implementation. The main tracing and original-color recovery us
 ## Exports and integration
 
 The workspace and WebM replay use a preview with a long edge of at most 1,600 pixels and a common scale on both axes. For original-size export, a web worker decodes the original file and rebuilds geometry from its pixels. The preview palette and color edits are preserved by projecting markers and separators into the original coordinate space. Import accepts up to 32 million pixels. Original-size export accepts up to 16 million pixels, subject to contour and layer complexity limits.
+
+The monitor uses the same contour vertices and brush-tip coordinates as the replay. It estimates ink width by counting contiguous ink pixels perpendicular to the current contour segment. During coloring it reports the active color, the total target pixels in its regions, and replay progress for both the active color and the painting phase.
 
 PNG provides a composite. PSD contains transparent ink, separate layers for assigned colors, and paper. SVG stores editable pen perimeters and color shapes. Coordinate JSON uses source pixels with a top-left origin. WebM records the replay. Project JSON retains originals, pen settings, color assignments, boundary edits, and speed settings.
 

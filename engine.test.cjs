@@ -24,12 +24,20 @@ test('original-size export projects edits in pixel-center coordinates', () => {
   assert.deepEqual(edits.markers, [{ x: 1501, y: 3001, role: 'blue' }]);
   assert.deepEqual(edits.barriers, [[0, 0, 2999, 3999]]);
 });
-const { segment, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, stylizeInk, inspectRaster, sampleColors, makeLayers } = require('./engine.js');
+const { segment, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, inkCrossSection, stylizeInk, inspectRaster, sampleColors, makeLayers } = require('./engine.js');
 
 function drawing(rows) {
   return { width: rows[0].length, height: rows.length,
     ink: Uint8Array.from(rows.join(''), pixel => pixel === '#' ? 0 : 255) };
 }
+
+test('measures local ink across horizontal and vertical contour edges', () => {
+  const image = drawing(['##...', '###..', '.##..', '..#..', '.....']);
+  assert.equal(inkCrossSection(image, .5, 0, 1, 0), 2);
+  assert.equal(inkCrossSection(image, 2, 1.5, 0, 1), 3);
+  assert.equal(inkCrossSection(image, 2.5, 4, -1, 0), 3);
+  assert.equal(inkCrossSection(image, 0, 3.5, 0, -1), 0);
+});
 
 test('a local barrier closes an open region without drawing a visible line', () => {
   const img = drawing(['.......', '.#####.', '.#...#.', '.....#.', '.#...#.', '.#####.', '.......']);

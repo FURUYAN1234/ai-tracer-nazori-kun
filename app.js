@@ -23,6 +23,11 @@
   let palettePanel;
   const colorChannels = [...document.querySelectorAll('[data-color-channel]')];
   const cache = new WeakMap();
+  const traceMonitor = $('trace-monitor');
+  const traceZoom = $('trace-zoom').getContext('2d');
+  const traceValues = Object.fromEntries([...traceMonitor.querySelectorAll('[data-trace-value]')]
+    .map(element => [element.dataset.traceValue, element]));
+  const traceCount = new Intl.NumberFormat('ja-JP');
 
   function canvas(width, height) {
     const result = document.createElement('canvas');
@@ -772,12 +777,13 @@
     const paths = [...contours].sort((a, b) => b.length - a.length);
     const total = paths.reduce((sum, shape) => sum + E.traceWeight(shape.length), 0);
     const distance = paths.reduce((sum, shape) => sum + shape.length, 0);
+    const pointCount = paths.reduce((sum, shape) => sum + shape.points.length, 0);
     const extraTime = Math.min(9000, Math.max(0, (distance - 85000) / 27));
     const inkTimeline = E.inkTimeline(rebuilt, paths, total);
     const image = $('movie');
     image.width = panel.width;
     image.height = panel.height;
-    replay = { panel, paths, total, colors, raw, inkPixels, inkTimeline, timing, jobs, returnToComparison,
+    replay = { panel, paths, total, colors, raw, inkPixels, inkTimeline, timing, jobs, returnToComparison, distance, pointCount,
       colorStart: jobs.length ? .67 : 1, duration: (jobs.length ? duration : 11100) + extraTime,
       ctx: image.getContext('2d'), frame: new ImageData(panel.width, panel.height), position: 0, running: false };
     $('replay').hidden = false;
@@ -834,15 +840,19 @@
     return { timing, jobs };
   }
 
-  function drawPerimeters(model, progress) {
+  function drawPerimeters(model, progress, monitor) {
     const { ctx, paths, panel, total } = model;
     let remaining = progress * total;
     let pointer;
+    let passedPoints = 0, passedDistance = 0, active;
     ctx.beginPath();
-    for (const { points, length } of paths) {
+    for (let index = 0; index < paths.length; index++) {
+      const { points, length } = paths[index];
       const [x, y] = points[0];
       const weight = E.traceWeight(length);
-      let distance = length * Math.min(1, remaining / weight);
+      const covered = length * Math.min(1, remaining / weight);
+      let distance = covered;
+      let segmentIndex = 0, segmentPortion = 0;
       ctx.moveTo(x, y);
       pointer = [x, y, 0];
       for (let j = 0; j < points.length && distance > 0; j++) {
@@ -850,17 +860,138 @@
         const [x2, y2] = points[(j + 1) % points.length];
         const segment = Math.abs(x2 - x1) + Math.abs(y2 - y1);
         const part = Math.min(1, distance / segment);
+        segmentIndex = j;
+        segmentPortion = part;
         pointer = [x1 + (x2 - x1) * part, y1 + (y2 - y1) * part, Math.atan2(y2 - y1, x2 - x1)];
         ctx.lineTo(pointer[0], pointer[1]);
         distance -= segment;
       }
       remaining -= weight;
-      if (remaining <= 0) break;
+      if (remaining <= 0 || index === paths.length - 1) {
+        if (monitor) {
+          const [x1, y1] = points[segmentIndex];
+          const [x2, y2] = points[(segmentIndex + 1) % points.length];
+          const dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1);
+          const span = Math.abs(x2 - x1) + Math.abs(y2 - y1);
+          const offset = Math.min(span - 1, Math.floor(span * segmentPortion)) + .5;
+          const reached = Math.min(points.length, segmentIndex + (segmentPortion === 1 ? 2 : 1));
+          active = { pointer, points, reached, stroke: index + 1, pointCount: passedPoints + reached,
+            distance: passedDistance + covered, angle: Math.atan2(dy, dx),
+            width: E.inkCrossSection({ width: panel.width, height: panel.height, ink: model.inkPixels },
+              x1 + dx * offset, y1 + dy * offset, dx, dy) };
+        }
+        break;
+      }
+      if (monitor) {
+        passedPoints += points.length;
+        passedDistance += length;
+      }
     }
     ctx.strokeStyle = '#8e4777';
     ctx.lineWidth = Math.max(1, panel.width / 430);
     ctx.stroke();
-    return pointer;
+    return { pointer, active };
+  }
+
+  function updateTraceState(model) {
+    if (traceMonitor.hidden) return;
+    const painting = model.jobs.length > 0 && model.position >= model.colorStart;
+    const tracing = model.position < model.colorStart * .95 && model.paths.length > 0;
+    const active = tracing || (painting && model.position < 1);
+    const live = active && model.running;
+    traceMonitor.toggleAttribute('data-painting', painting);
+    traceMonitor.toggleAttribute('data-live', live);
+    const action = painting ? '彩色' : 'トレス';
+    const text = live ? action + '中' : active ? '一時停止'
+      : painting || model.paths.length ? action + '完了' : '輪郭なし';
+    const title = action + 'モニター';
+    if ($('trace-monitor-title').textContent !== title) {
+      $('trace-monitor-title').textContent = title;
+      traceZoom.canvas.setAttribute('aria-label', '現在の' + action + '位置の拡大');
+    }
+    if ($('trace-monitor-state').textContent !== text) $('trace-monitor-state').textContent = text;
+  }
+
+  function updateTraceMonitor(model, progress, active) {
+    updateTraceState(model);
+    const finished = progress >= 1;
+    const percent = model.paths.length ? Math.min(100, progress * 100) : 0;
+    const format = value => traceCount.format(value);
+    const values = {
+      stroke: format(active?.stroke ?? (finished ? model.paths.length : 0)),
+      strokeTotal: '全 ' + format(model.paths.length) + ' 筆',
+      points: format(active?.pointCount ?? (finished ? model.pointCount : 0)),
+      pointTotal: '全 ' + format(model.pointCount) + ' 点',
+      width: active?.width ? format(active.width) + ' px' : '—',
+      strokePoints: active ? format(active.reached) + ' / ' + format(active.points.length) : '—',
+      x: active ? active.pointer[0].toFixed(1) : '—',
+      y: active ? active.pointer[1].toFixed(1) : '—',
+      distance: format(Math.round(active?.distance ?? (finished ? model.distance : 0))) + ' px',
+      angle: active ? Math.round(active.angle * 180 / Math.PI) + '°' : '—',
+    };
+    updateMonitorValues(percent, values);
+    drawMonitorZoom(model, active?.pointer, active);
+  }
+
+  function updatePaintMonitor(model, progress, jobIndex, pointer) {
+    updateTraceState(model);
+    const job = model.jobs[jobIndex];
+    const percent = Math.min(100, progress * 100);
+    const color = job?.color;
+    const chip = $('trace-color-chip');
+    if (color) chip.style.backgroundColor = color;
+    chip.hidden = !color;
+    updateMonitorValues(percent, {
+      paintStep: traceCount.format(job ? jobIndex + 1 : model.jobs.length),
+      paintTotal: '全 ' + traceCount.format(model.jobs.length) + ' 工程',
+      paintColor: color?.toUpperCase() ?? '—',
+      paintPixels: job ? traceCount.format(job.size) + ' px' : '—',
+      paintStepProgress: job ? (100 * (progress - job.start) / job.length).toFixed(1) + '%' : '—',
+      x: pointer ? pointer[0].toFixed(1) : '—',
+      y: pointer ? pointer[1].toFixed(1) : '—',
+    });
+    drawMonitorZoom(model, pointer);
+  }
+
+  function updateMonitorValues(percent, values) {
+    values.progress = percent.toFixed(1) + '%';
+    for (const [name, value] of Object.entries(values)) {
+      const element = traceValues[name];
+      if (element.textContent !== value) element.textContent = value;
+    }
+    $('trace-progress').value = percent;
+  }
+
+  function drawMonitorZoom(model, pointer, trace) {
+    const hint = $('trace-zoom-hint');
+    const { width, height } = traceZoom.canvas;
+    if (!pointer) {
+      if (hint.hidden) traceZoom.clearRect(0, 0, width, height);
+      hint.hidden = false;
+      return;
+    }
+    hint.hidden = true;
+    const [x, y] = pointer;
+    const scale = 4;
+    const centerX = width / 2, centerY = height / 2;
+    traceZoom.clearRect(0, 0, width, height);
+    traceZoom.imageSmoothingEnabled = false;
+    traceZoom.drawImage(model.ctx.canvas, x - centerX / scale, y - centerY / scale,
+      width / scale, height / scale, 0, 0, width, height);
+    traceZoom.fillStyle = '#39839c';
+    if (trace) {
+      const start = Math.max(0, trace.reached - 6);
+      for (let index = start; index < trace.reached; index++) {
+        const [px, py] = trace.points[index];
+        traceZoom.beginPath();
+        traceZoom.arc(centerX + (px - x) * scale, centerY + (py - y) * scale, 2.3, 0, Math.PI * 2);
+        traceZoom.fill();
+      }
+    }
+    traceZoom.fillStyle = '#c75633';
+    traceZoom.beginPath();
+    traceZoom.arc(centerX, centerY, 3.8, 0, Math.PI * 2);
+    traceZoom.fill();
   }
 
   function drawPointer(ctx, panel, [x, y, heading], color, brush) {
@@ -905,10 +1036,15 @@
   function drawReplay(t, model = replay) {
     const { ctx, panel, frame, raw, inkPixels, inkTimeline, colors, timing, jobs, colorStart } = model;
     const visible = model === replay;
+    const monitor = visible && !traceMonitor.hidden;
     model.position = t;
     if (visible) $('scrub').value = Math.round(t * 1000);
     if (t === 1) {
       if (visible) $('phase').textContent = '仕上がり';
+      if (monitor) {
+        if (jobs.length) updatePaintMonitor(model, 1);
+        else updateTraceMonitor(model, 1);
+      }
       frame.data.set(colors);
       ctx.putImageData(frame, 0, 0);
       return;
@@ -931,9 +1067,12 @@
       ctx.putImageData(frame, 0, 0);
       if (progress < 1) {
         ctx.globalAlpha = .56;
-        const pointer = drawPerimeters(model, progress);
+        const { pointer, active } = drawPerimeters(model, progress, monitor);
         ctx.globalAlpha = 1;
+        if (monitor) updateTraceMonitor(model, progress, active);
         if (pointer) drawPointer(ctx, panel, pointer, '#2e2338', false);
+      } else if (monitor) {
+        updateTraceMonitor(model, 1);
       }
       return;
     }
@@ -950,19 +1089,23 @@
       d[k + 3] = 255;
     }
     ctx.putImageData(frame, 0, 0);
-    const active = jobs.find(job => colorTime >= job.start && colorTime < job.start + job.length);
+    const jobIndex = jobs.findIndex(job => colorTime >= job.start && colorTime < job.start + job.length);
+    const active = jobs[jobIndex];
+    let sample;
     if (active) {
       let index = Math.min(24, Math.floor(25 * (colorTime - active.start) / active.length));
       while (index >= 0 && !active.samples[index]) index--;
-      const sample = index >= 0 ? active.samples[index] : active.samples.find(Boolean);
-      if (sample) drawPointer(ctx, panel, sample, active.color, true);
+      sample = index >= 0 ? active.samples[index] : active.samples.find(Boolean);
     }
+    if (monitor) updatePaintMonitor(model, colorTime, jobIndex, sample);
+    if (sample) drawPointer(ctx, panel, sample, active.color, true);
   }
 
   function resumeReplay() {
     if (replay.position === 1) drawReplay(0);
     const model = replay;
     model.running = true;
+    updateTraceState(model);
     const cycle = model.duration / (multiplier('draw-speed') * multiplier('speed'));
     const start = performance.now() - model.position * cycle;
     $('play').textContent = '▶ はじめから再生';
@@ -989,6 +1132,7 @@
     if (!replay) return;
     cancelAnimationFrame(replay.raf);
     replay.running = false;
+    updateTraceState(replay);
     $('replay-toggle').textContent = replay.position === 1 ? '↶ 巻き戻す' : replay.position === 0 ? '再生' : '再開';
     $('play').textContent = replay.position === 1 ? '↶ 巻き戻す' : '▶ はじめから再生';
     updateSourceKind();
@@ -1092,6 +1236,13 @@
     if (replay?.position === 1) rewind(); else openReplay();
   };
   $('replay-close').onclick = closeReplay;
+  $('trace-monitor-toggle').onclick = event => {
+    const open = traceMonitor.hidden;
+    traceMonitor.hidden = !open;
+    event.currentTarget.setAttribute('aria-expanded', String(open));
+    event.currentTarget.textContent = open ? '計器を隠す' : '計器を表示';
+    if (open && !replay.running) drawReplay(replay.position);
+  };
   function multiplier(id) { return Number($(id).value) / 100; }
   function restoreSpeeds(preferences = {}) {
     for (const [id, name] of [['draw-speed', 'drawSpeed'], ['speed', 'playbackSpeed']]) {
