@@ -16,7 +16,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>AIトレーサー なぞり君</strong><span class="version">v0.1.4</span></div>
+    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>AIトレーサー なぞり君</strong><span class="version">v0.1.5</span></div>
     <button id="import" class="ink-button" type="button">画像を取り込む</button>
     <div class="toolbar">
       <small id="project-saves">原稿・配色・ペン設定を保存して、続きから開けます。</small>
@@ -71,15 +71,49 @@
         </div>
       </div>
       <div id="replay" class="replay" hidden>
-        <canvas id="movie" aria-label="線の再構築と彩色の再生"></canvas>
-        <div class="timeline">
-          <button id="replay-toggle" type="button">一時停止</button>
-          <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="再生位置">
-          <span id="phase" aria-live="off"></span>
-          <label class="speed-control">再生速度<input id="speed" type="range" min="25" max="250" step="5" value="100"><output id="speed-value">1倍</output></label>
-          <button id="save-video" type="button">動画を保存</button>
-          <button id="replay-close" type="button">閉じる</button>
+        <div class="replay-main">
+          <canvas id="movie" aria-label="線の再構築と彩色の再生"></canvas>
+          <div class="timeline">
+            <button id="replay-toggle" type="button">一時停止</button>
+            <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="再生位置">
+            <span id="phase" aria-live="off"></span>
+            <label class="speed-control">再生速度<input id="speed" type="range" min="25" max="250" step="5" value="100"><output id="speed-value">1倍</output></label>
+            <button id="save-video" type="button">動画を保存</button>
+            <button id="trace-monitor-toggle" type="button" aria-expanded="true" aria-controls="trace-monitor">計器を隠す</button>
+            <button id="replay-close" type="button">閉じる</button>
+          </div>
         </div>
+        <section id="trace-monitor" aria-labelledby="trace-monitor-title">
+          <header class="trace-monitor-header">
+            <h2 id="trace-monitor-title">トレスモニター</h2>
+            <span id="trace-monitor-state">待機</span>
+          </header>
+          <div class="trace-scope">
+            <canvas id="trace-zoom" width="256" height="144" aria-label="現在のトレス位置の拡大"></canvas>
+            <span id="trace-zoom-hint" hidden>再生中の筆先を表示</span>
+            <span class="trace-zoom-label">拡大</span>
+          </div>
+          <dl class="trace-readout">
+            <div data-monitor-trace><dt>筆数（輪郭）</dt><dd><span data-trace-value="stroke">—</span><small data-trace-value="strokeTotal"></small></dd></div>
+            <div data-monitor-trace><dt>記録点</dt><dd><span data-trace-value="points">—</span><small data-trace-value="pointTotal"></small></dd></div>
+            <div data-monitor-paint><dt>彩色工程</dt><dd><span data-trace-value="paintStep">—</span><small data-trace-value="paintTotal"></small></dd></div>
+            <div data-monitor-paint><dt>塗っている色</dt><dd class="trace-color"><span id="trace-color-chip" aria-hidden="true" hidden></span><span data-trace-value="paintColor">—</span></dd></div>
+            <div data-monitor-trace><dt title="現在位置の描画画像から測った概算">推定線幅</dt><dd data-trace-value="width">—</dd></div>
+            <div data-monitor-trace><dt>この筆の点数</dt><dd data-trace-value="strokePoints">—</dd></div>
+            <div data-monitor-paint><dt>この色の対象画素</dt><dd data-trace-value="paintPixels">—</dd></div>
+            <div data-monitor-paint><dt>この色の進捗</dt><dd data-trace-value="paintStepProgress">—</dd></div>
+            <div><dt>X 座標</dt><dd data-trace-value="x">—</dd></div>
+            <div><dt>Y 座標</dt><dd data-trace-value="y">—</dd></div>
+            <div data-monitor-trace><dt>累計距離</dt><dd data-trace-value="distance">—</dd></div>
+            <div data-monitor-trace><dt>進行方向</dt><dd data-trace-value="angle">—</dd></div>
+          </dl>
+          <div class="trace-progress">
+            <label for="trace-progress"><span data-monitor-trace>トレス進捗</span><span data-monitor-paint>彩色全体の進捗</span></label><span data-trace-value="progress">0.0%</span>
+            <progress id="trace-progress" max="100" value="0"></progress>
+          </div>
+          <p class="trace-method" data-monitor-trace><strong>このトレスは AI 不使用</strong><br>輪郭追跡アルゴリズムで処理</p>
+          <p class="trace-method" data-monitor-paint><strong>この彩色は AI 不使用</strong><br>領域ごとに色を割り当てて処理</p>
+        </section>
       </div>
       <div id="view" class="views"></div>
       <section id="export-page" aria-labelledby="export-heading" hidden>
