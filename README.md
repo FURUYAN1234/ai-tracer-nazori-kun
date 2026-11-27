@@ -1,7 +1,7 @@
 # AI Tracer Nazori-kun / AIトレーサー なぞり君
 
 [![Open the web app / Webアプリを開く](docs/assets/button-open.png)](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
-<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.5.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.5 source ZIP / v0.1.5のソースZIPをダウンロード" width="232" height="53"></a>
+<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.6.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.6 source ZIP / v0.1.6のソースZIPをダウンロード" width="232" height="53"></a>
 [![Download the manual PDF / 操作マニュアルPDFをダウンロード](docs/assets/button-manual.png)](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases/latest/download/nazori-kun-manual.pdf)
 
 [v0.1.4 walkthrough (YouTube) / v0.1.4の操作動画（YouTube）](https://youtu.be/Zf8ESjz5FSs) · [Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
@@ -12,20 +12,23 @@ The browser runs the entire drawing pipeline locally with explicit algorithms an
 
 ## Download and run locally / ZIPをダウンロードしてローカルで使う
 
-You need Node.js 22.15 or later and Python 3. Use a local server to load the built-in samples and export at the original size. / Node.js 22.15以降とPython 3が必要です。付属作例の読み込みや元寸での保存が使えるよう、ローカルサーバーで起動します。
+### Windows launcher / Windowsのバッチ起動
 
-1. [Download the v0.1.5 source ZIP / v0.1.5のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.5.zip) and extract it. / ZIPを保存して展開します。WindowsではZIPを右クリックし、**すべて展開** を選びます。
-2. Open a terminal in the extracted folder that contains `package.json`. On Windows, you can open that folder in File Explorer, type `cmd` in the address bar, and press Enter. / 展開したフォルダーのうち、`package.json` がある場所でターミナルを開きます。Windowsならエクスプローラーのアドレスバーに `cmd` と入力して Enter を押します。
-3. Build the app and start the local server. Run the commands one at a time. / 下のコマンドを1行ずつ入力し、アプリのビルドとローカルサーバーの起動を行います。
+1. Install [Node.js](https://nodejs.org/) 22.15 or later. / [Node.js](https://nodejs.org/) 22.15以降をインストールします。
+2. [Download the v0.1.6 source ZIP / v0.1.6のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.6.zip) and choose **Extract All**. / ZIPを保存して右クリックし、 **すべて展開** を選びます。
+3. Double-click `start_nazori.bat` in the extracted folder. The launcher checks the official GitHub release, verifies updated files, and opens the app at `http://127.0.0.1:8000/`. It also starts a local MCP endpoint. / 展開先の `start_nazori.bat` をダブルクリックします。公式GitHubの最新版を確認し、更新ファイルを検証してからブラウザーで `http://127.0.0.1:8000/` を開きます。同時にローカルMCPの接続先が立ち上がります。
+4. Keep the console open while using the local app. Press Ctrl+C there to stop. If an update fails, the launcher uses a working version. / 使用中は起動ウィンドウを開いたままにします。終了はそのウィンドウでCtrl+Cです。更新に失敗した場合は、起動できる版を使います。
 
-   ```shell
-   npm run build
-   py -3 -m http.server 8000 --bind 127.0.0.1 --directory dist
-   ```
+The launcher keeps versions and a separate MCP workspace under `%LOCALAPPDATA%\NazoriKun`. Node.js is the only prerequisite for the Windows batch. The app can be operated manually. / 実行用のバージョンとMCP専用フォルダーは `%LOCALAPPDATA%\NazoriKun` に置きます。Windowsのバッチ起動に必要なのはNode.jsです。通常の画面操作はエージェントなしで使えます。
 
-   On macOS or Linux, use `python3` in place of `py -3`. On Windows, `python` also works if it launches Python 3. / macOS・Linuxでは `py -3` を `python3` に置き換えます。Windowsでも `python` でPython 3を起動できる場合は、`python` に置き換えられます。
+### macOS or Linux / macOS・Linuxの手動起動
 
-4. Leave the terminal open. In your browser, enter `http://127.0.0.1:8000/` and click **トレスする** (Trace) on the sample. To stop the server, press Ctrl+C in the terminal. / ターミナルを開いたまま、ブラウザーのアドレスバーに `http://127.0.0.1:8000/` を入力します。作例が表示されたら **トレスする** を押します。終了するときは、ターミナルで Ctrl+C を押します。
+With Node.js 22.15 or later and Python 3, run these commands from the extracted folder, then open `http://127.0.0.1:8000/`. / Node.js 22.15以降とPython 3を用意します。展開したフォルダーで以下を順に実行し、 `http://127.0.0.1:8000/` を開きます。
+
+```shell
+npm run build
+python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
+```
 
 ![Color workspace with the original on the left and the traced result on the right / カラー作業画面、左に元絵、右にトレス結果](docs/assets/workspace-color.jpg)
 
@@ -171,7 +174,15 @@ The contour and color schedules reconstruct a plausible drawing process from a s
 
 ## MCP
 
-Local stdio, Node.js 22.15 or later. Pass a dedicated directory that contains only allowed input and output files. / ローカルの標準入出力で接続します。Node.js 22.15以降で、読み書きを許可する専用フォルダーを指定します。
+On Windows, connect a Streamable HTTP client to `http://127.0.0.1:8000/mcp` while the launcher is running. Read the `token` from the connection file shown in the launch window. Send it as an `Authorization: Bearer …` header and keep it private. The workspace is shown in the same window. / Windowsではバッチ起動中に、Streamable HTTP対応のMCPクライアントを `http://127.0.0.1:8000/mcp` へ接続できます。起動ウィンドウが示す接続ファイルの `token` を `Authorization: Bearer …` ヘッダーに設定し、共有しないでください。入出力先も同じウィンドウに表示されます。
+
+An MCP client that launches a local stdio command on Windows can use the same batch with `--mcp` as the first argument. Use a dedicated input/output directory. This command checks for an update before it starts the session. / Windowsで標準入出力のMCPを登録する場合も、同じバッチの最初の引数に `--mcp` を指定できます。入出力には専用フォルダーを指定してください。セッションを始める前に更新を確認します。
+
+```bat
+start_nazori.bat --mcp --workspace "<absolute-workspace-path>"
+```
+
+Direct stdio remains available on any supported OS. / 各対応OSで直接STDIO接続する場合は次のコマンドを使えます。
 
 ```text
 node mcp.cjs --workspace <absolute-workspace-path>

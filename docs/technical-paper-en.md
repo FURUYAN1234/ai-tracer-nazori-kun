@@ -1,4 +1,4 @@
-# AI Tracer Nazori-kun v0.1.5 Technical Report
+# AI Tracer Nazori-kun v0.1.6 Technical Report
 
 November 25, 2026 · FURU
 
@@ -23,7 +23,7 @@ The monitor uses the same contour vertices and brush-tip coordinates as the repl
 
 PNG provides a composite. PSD contains transparent ink, separate layers for assigned colors, and paper. SVG stores editable pen perimeters and color shapes. Coordinate JSON uses source pixels with a top-left origin. WebM records the replay. Project JSON retains originals, pen settings, color assignments, boundary edits, and speed settings.
 
-The local MCP server uses standard input and output. It accepts PNGs from a designated workspace and writes PNG, PSD, SVG, and coordinate JSON to a new directory under that workspace.
+The local MCP server supports standard input and output and authenticated Streamable HTTP through the Windows launcher. It accepts PNGs from a designated workspace and writes PNG, PSD, SVG, and coordinate JSON to a new directory under that workspace. The Windows batch launcher checks the official GitHub release and verifies files against the commit referenced by its tag before installing them. If the update fails, it uses a working version. The HTTP listener binds to 127.0.0.1 and requires a token generated at launch for MCP requests.
 
 ## Verification and limitations
 

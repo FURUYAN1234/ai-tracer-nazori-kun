@@ -7,12 +7,6 @@ const PNG = require('./png.cjs');
 const PSD = require('./psd.js');
 const { version } = require('./package.json');
 
-if (process.argv[2] !== '--workspace' || !process.argv[3]) {
-  process.stderr.write('Usage: node mcp.cjs --workspace <input/output directory>\n');
-  process.exit(2);
-}
-const workspace = fs.realpathSync(process.argv[3]);
-if (!fs.statSync(workspace).isDirectory()) throw new Error('A workspace directory is required.');
 const versions = new Set(['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']);
 const tool = {
   name: 'nazori_trace_png',
@@ -32,7 +26,7 @@ const tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
 };
 
-function trace({ input, pen = 'g', strength = 100, threshold = 180, ...other }) {
+function trace(workspace, { input, pen = 'g', strength = 100, threshold = 180, ...other }) {
   if (typeof input !== 'string' || !input || path.isAbsolute(input) || path.extname(input).toLowerCase() !== '.png'
       || !tool.inputSchema.properties.pen.enum.includes(pen) || !Number.isInteger(strength) || strength < 0 || strength > 100
       || !Number.isInteger(threshold) || threshold < 32 || threshold > 248 || Object.keys(other).length)
@@ -80,40 +74,61 @@ function trace({ input, pen = 'g', strength = 100, threshold = 180, ...other }) 
     paths: artifacts.map(([name]) => path.relative(workspace, path.join(folder, name)).split(path.sep).join('/')) };
 }
 
-const send = data => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...data }) + '\n');
-const input = readline.createInterface({ input: process.stdin, terminal: false });
-let phase = 'new';
-input.on('line', line => {
-  let message;
-  try {
-    if (line.length > 65536) throw new Error('Request too large.');
-    message = JSON.parse(line);
-  } catch {
-    return send({ id: null, error: { code: -32700, message: 'Invalid JSON-RPC frame.' } });
-  }
-  if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string')
-    return send({ id: message?.id ?? null, error: { code: -32600, message: 'Invalid request.' } });
-  if (!Object.hasOwn(message, 'id')) {
-    if (message.method === 'notifications/initialized' && phase === 'initializing') phase = 'ready';
-    return;
-  }
-  const { id, method, params } = message;
-  if (method === 'initialize' && phase === 'new') {
-    phase = 'initializing';
-    const protocolVersion = versions.has(params?.protocolVersion) ? params.protocolVersion : '2025-11-25';
-    return send({ id, result: { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'nazori-kun', version } } });
-  }
-  if (method === 'ping') return send({ id, result: {} });
-  if (phase !== 'ready') return send({ id, error: { code: -32002, message: 'Initialize the MCP session first.' } });
-  if (method === 'tools/list') return send({ id, result: { tools: [tool] } });
-  if (method === 'tools/call' && params?.name === tool.name) {
-    try {
-      const result = trace(params.arguments ?? {});
-      return send({ id, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } });
-    } catch (error) {
-      const message = error.code ? 'The PNG could not be opened or written inside the workspace.' : error.message;
-      return send({ id, result: { isError: true, content: [{ type: 'text', text: message }] } });
+function createMcpSession(directory) {
+  const workspace = fs.realpathSync(directory);
+  if (!fs.statSync(workspace).isDirectory()) throw new Error('A workspace directory is required.');
+  let phase = 'new';
+  const response = data => ({ jsonrpc: '2.0', ...data });
+
+  return message => {
+    if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string')
+      return response({ id: message?.id ?? null, error: { code: -32600, message: 'Invalid request.' } });
+    if (!Object.hasOwn(message, 'id')) {
+      if (message.method === 'notifications/initialized' && phase === 'initializing') phase = 'ready';
+      return;
     }
+    const { id, method, params } = message;
+    if (method === 'initialize' && phase === 'new') {
+      phase = 'initializing';
+      const protocolVersion = versions.has(params?.protocolVersion) ? params.protocolVersion : '2025-11-25';
+      return response({ id, result: { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'nazori-kun', version } } });
+    }
+    if (method === 'ping') return response({ id, result: {} });
+    if (phase !== 'ready') return response({ id, error: { code: -32002, message: 'Initialize the MCP session first.' } });
+    if (method === 'tools/list') return response({ id, result: { tools: [tool] } });
+    if (method === 'tools/call' && params?.name === tool.name) {
+      try {
+        const result = trace(workspace, params.arguments ?? {});
+        return response({ id, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } });
+      } catch (error) {
+        const message = error.code ? 'The PNG could not be opened or written inside the workspace.' : error.message;
+        return response({ id, result: { isError: true, content: [{ type: 'text', text: message }] } });
+      }
+    }
+    return response({ id, error: { code: method === 'tools/call' ? -32602 : -32601, message: 'Unknown method or tool.' } });
+  };
+}
+
+module.exports = { createMcpSession };
+
+if (require.main === module) {
+  if (process.argv[2] !== '--workspace' || !process.argv[3]) {
+    process.stderr.write('Usage: node mcp.cjs --workspace <input/output directory>\n');
+    process.exit(2);
   }
-  send({ id, error: { code: method === 'tools/call' ? -32602 : -32601, message: 'Unknown method or tool.' } });
-});
+  const dispatch = createMcpSession(process.argv[3]);
+  const input = readline.createInterface({ input: process.stdin, terminal: false });
+  input.on('line', line => {
+    let message;
+    try {
+      if (line.length > 65536) throw new Error('Request too large.');
+      message = JSON.parse(line);
+    } catch {
+      message = undefined;
+    }
+    const result = message === undefined
+      ? { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Invalid JSON-RPC frame.' } }
+      : dispatch(message);
+    if (result) process.stdout.write(JSON.stringify(result) + '\n');
+  });
+}
