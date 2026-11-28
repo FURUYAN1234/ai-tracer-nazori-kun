@@ -18,6 +18,9 @@
   let recording = false;
   let exportSelection;
   let savingExport = false;
+  let paintingPanel;
+  let paintingView;
+  let paintingRetry;
   let savingProject = false;
   let colorEdit;
   let palettePanel;
@@ -394,6 +397,31 @@
     $('view').hidden = preview || Boolean(replay);
     $('export-page').hidden = !preview;
     $('palette-settings').hidden = !showsPalette() || Boolean(replay);
+    renderPaintingExport();
+  }
+
+  function renderPaintingExport() {
+    const panel = state.panels[selection.index];
+    const shown = panel?.traced && !exportSelection && !replay && selection.view !== 'works';
+    $('painting-export').hidden = !shown;
+    if (!shown) return;
+    if (paintingPanel !== panel || paintingView !== selection.view) {
+      paintingPanel = panel;
+      paintingView = selection.view;
+      $('painting-variant').value = selection.variant;
+      clearPaintingFeedback();
+    }
+    const colored = panelHasColor(panel);
+    const comparing = colored && selection.view === 'compare';
+    $('painting-touchup').hidden = !colored;
+    $('painting-variant-control').hidden = !comparing;
+    const width = panel.originalFile ? panel.originalWidth : panel.width;
+    const height = panel.originalFile ? panel.originalHeight : panel.height;
+    const variant = comparing ? $('painting-variant').value : selection.variant;
+    $('painting-dimensions').textContent = [
+      colored && !comparing ? exportLabels[variant] : '',
+      (panel.originalFile ? '元寸 ' : '') + dimensions(width, height),
+    ].filter(Boolean).join(' · ');
   }
 
   function render(refreshRoles = true) {
@@ -681,7 +709,7 @@
     return width + ' × ' + height + ' px';
   }
 
-  function originalExport(panel, mode, type) {
+  function originalExport(panel, mode, type, paintingPreset) {
     return new Promise((resolve, reject) => {
       const worker = new Worker('export-worker.js');
       const finish = (callback, value) => {
@@ -700,7 +728,8 @@
           originalFile, originalWidth, originalHeight } = panel;
         worker.postMessage({ file: originalFile, originalWidth, originalHeight,
           panel: { width, height, markers, barriers, sourceRoles, palette: sourcePalette },
-          roles: panelRoles(panel), threshold: state.threshold, pen: state.pen, strength: state.strength, mode, type });
+          roles: panelRoles(panel), threshold: state.threshold, pen: state.pen, strength: state.strength,
+          mode, type, paintingPreset });
       } catch (error) {
         finish(reject, error);
       }
@@ -731,6 +760,59 @@
     const stack = E.makeLayers(pen, model.layout, assignments, roles);
     const layers = window.KomaPSD(panel, stack, E.paint(pen, model.layout, assignments, colors));
     downloadExport(new Blob(layers, { type: 'image/vnd.adobe.photoshop' }), panel.name + (mode === 'b' ? '-b' : '') + '.psd');
+  }
+
+  function clearPaintingFeedback(message = '') {
+    paintingRetry = undefined;
+    $('painting-preview').hidden = true;
+    $('painting-feedback').textContent = message;
+    $('painting-feedback').hidden = !message;
+  }
+
+  async function savePainting(preset, retry) {
+    if (savingExport || savingProject || busy) return;
+    const panel = state.panels[selection.index];
+    if ($('painting-export').hidden || (retry && retry.panel !== panel)) return;
+    const mode = retry?.mode ?? (panelHasColor(panel)
+      ? (selection.view === 'compare' ? $('painting-variant').value : selection.variant) : 'ink');
+    const original = panel.originalFile && !retry;
+    const locked = ['painting-recolor', 'painting-touchup', 'painting-preview', 'painting-variant',
+      'import', 'open-project', 'save-project', 'work-screen', 'image-screen'].map($);
+    const previous = locked.map(input => input.disabled);
+    savingExport = true;
+    locked.forEach(input => { input.disabled = true; });
+    const workControls = $('work-controls');
+    const inspector = document.querySelector('.inspector');
+    workControls.inert = inspector.inert = true;
+    $('view').inert = true;
+    clearPaintingFeedback(original ? '元寸のPSDを作成中…' : 'PSDを作成中…');
+    try {
+      let blob;
+      if (original) {
+        blob = await originalExport(panel, mode, 'psd', preset);
+      } else {
+        const model = geometry(panel);
+        const roles = mode === 'ink' ? [] : panelRoles(panel).map(role => ({ ...role, hex: role[mode] }));
+        const { stack, flat, activeLayer } = E.makePaintingPsd(styled(model), model.layout,
+          assignedColors(panel, model.layout), roles, preset);
+        blob = new Blob(window.KomaPSD(panel, stack, flat, activeLayer), { type: 'image/vnd.adobe.photoshop' });
+      }
+      const name = panel.name + (mode === 'b' ? '-b' : '') + '-' + preset + (original ? '-original' : '') + '.psd';
+      download(blob, name);
+      clearPaintingFeedback(name + ' のダウンロードを開始しました。');
+    } catch (error) {
+      clearPaintingFeedback(original ? error.message : 'PSDを作成できませんでした。もう一度お試しください。');
+      if (original) {
+        paintingRetry = { panel, mode, preset };
+        $('painting-preview').textContent = 'プレビュー寸法で保存（' + dimensions(panel.width, panel.height) + '）';
+        $('painting-preview').hidden = false;
+      }
+    } finally {
+      savingExport = false;
+      workControls.inert = inspector.inert = false;
+      $('view').inert = false;
+      locked.forEach((input, i) => { input.disabled = previous[i]; });
+    }
   }
 
   function saveVector(format, panel, mode) {
@@ -1425,6 +1507,10 @@
     }
   };
   $('export-type').onchange = () => { $('export-status').textContent = ''; };
+  $('painting-recolor').onclick = () => savePainting('recolor');
+  $('painting-touchup').onclick = () => savePainting('touchup');
+  $('painting-variant').onchange = () => clearPaintingFeedback();
+  $('painting-preview').onclick = () => paintingRetry && savePainting(paintingRetry.preset, paintingRetry);
   $('close-export').onclick = closeExport;
   const surfaces = [...document.querySelectorAll('header, main')];
   surfaces.forEach(element => { element.inert = true; });
