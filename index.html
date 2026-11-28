@@ -112,6 +112,25 @@
         </section>
       </div>
       <div id="view" class="views"></div>
+      <section id="painting-export" class="painting-export" aria-labelledby="painting-heading" hidden>
+        <div class="painting-heading">
+          <h2 id="painting-heading">塗り直し用PSDを保存</h2>
+          <span id="painting-dimensions"></span>
+        </div>
+        <div class="painting-actions">
+          <button id="painting-recolor" class="ink-button" type="button">線画から塗る</button>
+          <button id="painting-touchup" type="button">今の配色に加筆</button>
+          <label id="painting-variant-control" hidden>配色
+            <select id="painting-variant">
+              <option value="a">配色 A</option>
+              <option value="b">配色 B</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">クリスタではPSDを開き、ペンの下の「彩色」または「加筆」を選びます。</p>
+        <p id="painting-feedback" class="hint" role="status" hidden></p>
+        <button id="painting-preview" type="button" hidden></button>
+      </section>
       <section id="export-page" aria-labelledby="export-heading" hidden>
         <div class="preview-heading">
           <button id="close-export" type="button"></button>

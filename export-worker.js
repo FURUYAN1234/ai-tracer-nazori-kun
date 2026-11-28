@@ -5,7 +5,7 @@ const engine = self.KomaEngine;
 const raster = self.NazoriRaster;
 const limits = { edges: 1_500_000, regions: 150_000, layerBytes: 240 * 1024 * 1024 };
 
-self.onmessage = async ({ data: { file, originalWidth, originalHeight, panel, roles, threshold, pen, strength, mode, type } }) => {
+self.onmessage = async ({ data: { file, originalWidth, originalHeight, panel, roles, threshold, pen, strength, mode, type, paintingPreset } }) => {
   try {
     const { width, height } = await raster.inspectFile(file);
     if (!raster.canExportOriginal(width, height)) throw new Error('元寸保存は1,600万画素以下です。');
@@ -52,9 +52,11 @@ self.onmessage = async ({ data: { file, originalWidth, originalHeight, panel, ro
         const stack = engine.makeLayers(styled, layout, assignments, selected, limits.layerBytes);
         blob = new Blob([engine.makeSvg(shape, paths, stack, limits.edges)], { type: 'image/svg+xml' });
       } else if (type === 'psd') {
-        const stack = engine.makeLayers(styled, layout, assignments, selected, limits.layerBytes);
-        blob = new Blob(self.KomaPSD(shape, stack, engine.paint(styled, layout, assignments, colors)),
-          { type: 'image/vnd.adobe.photoshop' });
+        const { stack, flat, activeLayer } = paintingPreset
+          ? engine.makePaintingPsd(styled, layout, assignments, selected, paintingPreset, limits.layerBytes)
+          : { stack: engine.makeLayers(styled, layout, assignments, selected, limits.layerBytes),
+            flat: engine.paint(styled, layout, assignments, colors) };
+        blob = new Blob(self.KomaPSD(shape, stack, flat, activeLayer), { type: 'image/vnd.adobe.photoshop' });
       } else {
         ctx.putImageData(new ImageData(engine.paint(styled, layout, assignments, colors), image.width, image.height), 0, 0);
         blob = await surface.convertToBlob({ type: 'image/png' });

@@ -1,6 +1,6 @@
-# AI Tracer Nazori-kun v0.1.6 Technical Report
+# AI Tracer Nazori-kun v0.1.7 Technical Report
 
-November 25, 2026 · FURU
+November 28, 2026 · FURU
 
 ## Abstract
 
@@ -24,6 +24,12 @@ The monitor uses the same contour vertices and brush-tip coordinates as the repl
 PNG provides a composite. PSD contains transparent ink, separate layers for assigned colors, and paper. SVG stores editable pen perimeters and color shapes. Coordinate JSON uses source pixels with a top-left origin. WebM records the replay. Project JSON retains originals, pen settings, color assignments, boundary edits, and speed settings.
 
 The local MCP server supports standard input and output and authenticated Streamable HTTP through the Windows launcher. It accepts PNGs from a designated workspace and writes PNG, PSD, SVG, and coordinate JSON to a new directory under that workspace. The Windows batch launcher checks the official GitHub release and verifies files against the commit referenced by its tag before installing them. If the update fails, it uses a working version. The HTTP listener binds to 127.0.0.1 and requires a token generated at launch for MCP requests.
+
+### Painting-ready PSDs
+
+The comparison view offers two exports, Paint from line art and Touch up the current palette. Both place an empty raster layer directly below the locked ink. PSD section dividers group the recovered colors in a folder. The line art preset hides that folder and writes a white-paper line art composite. The touch-up preset uses palette A or B and retains the visibility of each recovered color layer. Edits on the separate painting layer remain intact when the color folder is shown again.
+
+The encoder marks the painting layer in the PSD layer-state and layer-selection resources. Preview-size and original-size exports call the same layer builder. Export visibility is scoped to the resulting PSD and preserves the source, palette, and history in the project.
 
 ## Verification and limitations
 

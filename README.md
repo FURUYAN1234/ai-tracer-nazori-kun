@@ -1,7 +1,7 @@
 # AI Tracer Nazori-kun / AIトレーサー なぞり君
 
 [![Open the web app / Webアプリを開く](docs/assets/button-open.png)](https://furuyan1234.github.io/ai-tracer-nazori-kun/)
-<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.6.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.6 source ZIP / v0.1.6のソースZIPをダウンロード" width="232" height="53"></a>
+<a href="https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.7.zip"><img src="docs/assets/button-download-zip.png" alt="Download the v0.1.7 source ZIP / v0.1.7のソースZIPをダウンロード" width="232" height="53"></a>
 [![Download the manual PDF / 操作マニュアルPDFをダウンロード](docs/assets/button-manual.png)](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases/latest/download/nazori-kun-manual.pdf)
 
 [v0.1.4 walkthrough (YouTube) / v0.1.4の操作動画（YouTube）](https://youtu.be/Zf8ESjz5FSs) · [Illustrated guide and narrated demo / 画像付き解説と実演動画（note）](https://note.com/happy_duck780/n/n75301de9493a) · [Releases / リリース](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/releases) · [AI Manga Creative Suite](https://note.com/happy_duck780/n/nbdf826604ce7)
@@ -15,7 +15,7 @@ The browser runs the entire drawing pipeline locally with explicit algorithms an
 ### Windows launcher / Windowsのバッチ起動
 
 1. Install [Node.js](https://nodejs.org/) 22.15 or later. / [Node.js](https://nodejs.org/) 22.15以降をインストールします。
-2. [Download the v0.1.6 source ZIP / v0.1.6のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.6.zip) and choose **Extract All**. / ZIPを保存して右クリックし、 **すべて展開** を選びます。
+2. [Download the v0.1.7 source ZIP / v0.1.7のソースZIPをダウンロード](https://github.com/FURUYAN1234/ai-tracer-nazori-kun/archive/refs/tags/v0.1.7.zip) and choose **Extract All**. / ZIPを保存して右クリックし、 **すべて展開** を選びます。
 3. Double-click `start_nazori.bat` in the extracted folder. The launcher checks the official GitHub release, verifies updated files, and opens the app at `http://127.0.0.1:8000/`. It also starts a local MCP endpoint. / 展開先の `start_nazori.bat` をダブルクリックします。公式GitHubの最新版を確認し、更新ファイルを検証してからブラウザーで `http://127.0.0.1:8000/` を開きます。同時にローカルMCPの接続先が立ち上がります。
 4. Keep the console open while using the local app. Press Ctrl+C there to stop. If an update fails, the launcher uses a working version. / 使用中は起動ウィンドウを開いたままにします。終了はそのウィンドウでCtrl+Cです。更新に失敗した場合は、起動できる版を使います。
 
@@ -70,6 +70,19 @@ Open a thumbnail from **画像一覧**, or use **保存…** above an image in t
 **プロジェクトを保存** stores original images, palettes, region boundaries, pen and speed settings, and the selected image in a project JSON file. Open it with **プロジェクトを開く** to resume. **原稿の操作 → 同じ設定で原稿を差し替え** lets you use your current pen settings with a new image. / **プロジェクトを保存** は原稿・配色・塗り分け境界・ペン・速度・選択中の画像をプロジェクトJSONに記録します。**プロジェクトを開く** で続きから作業できます。**原稿の操作 → 同じ設定で原稿を差し替え** は、今のペン設定で別の原稿をトレスするときに使います。
 
 For the full illustrated workflow, choose **操作マニュアル PDF** in the application header. The PDF includes the file types, API settings, and local MCP setup. / 画面上部の **操作マニュアル PDF** で、画像付きの手順、保存形式、API設定とローカルMCP連携を確認できます。
+
+### PSD ready for painting / 塗り直し用PSD
+
+Run **トレスする** (Trace), then look below the comparison for **塗り直し用PSDを保存**. Each button starts one PSD download. The line-art view has the same shortcuts. / 原稿をトレスし、比較画像の下にある **塗り直し用PSDを保存** を使います。一度押すとPSDの保存が始まります。「元絵と線画」の画面からも使えます。
+
+| Button / ボタン | What opens in the editor / 開いたときの状態 |
+| --- | --- |
+| Paint from line art / 線画から塗る | White paper, locked ink, and an empty **彩色** (Paint) layer directly below the ink. Reveal the **トレス色** folder for a color reference. / 白い用紙を表示し、ロックしたペン線の直下に透明な **彩色** レイヤーを作ります。復元した色を参考にするときは、非表示の **トレス色** フォルダーを表示します。 |
+| Touch up the current palette / 今の配色に加筆 | The **トレス色** folder retains the chosen palette and each color layer's visibility. Use the empty **加筆** (Touch-up) layer to repaint a jacket or add a shadow. / 選んだ配色と色別レイヤーの表示設定を引き継ぎます。服の塗り替えや影の描き足しは、透明な **加筆** レイヤーで行います。 |
+
+Use **File → Open** in CLIP STUDIO PAINT or Photoshop. In CLIP STUDIO PAINT, select **彩色** or **加筆** directly below **ペン**. Photoshop uses the initial selection stored in the PSD. Unlock **ペン** to edit the ink itself. / クリスタまたはPhotoshopで **ファイル → 開く** を使います。クリスタでは **ペン** の直下の **彩色** または **加筆** を選びます。PhotoshopではPSDに記録した作業レイヤーが選ばれます。線そのものを直すときは **ペン** のロックを外します。
+
+The A/B comparison offers a palette selector. Monochrome traces offer Paint from line art. When original-size processing fails, a message and a preview-size save button appear. / 配色A・Bの比較画面では保存する配色を選べます。白黒原稿では **線画から塗る** を使います。元寸処理に失敗した場合は、理由と **プレビュー寸法で保存** ボタンが表示されます。
 
 ### Original-size export / 元寸保存
 

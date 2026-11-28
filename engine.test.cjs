@@ -187,6 +187,38 @@ test('independent color layers and transparent pen recompose the displayed image
   assert.deepEqual(composite, paint(img, layout, assignments, Object.fromEntries(roles.map(role => [role.id, role.hex]))));
 });
 
+test('painting PSD keeps the colors recoverable and targets the transparent working layer', () => {
+  const { makePaintingPsd } = require('./engine.js');
+  const encode = require('./psd.js');
+  const ink = drawing(['.#.', '.#.', '.#.']);
+  const layout = segment(ink, 180);
+  const assignments = new Map([[layout.labels[0], 'red'], [layout.labels[2], 'blue']]);
+  const roles = [
+    { id: 'red', name: 'Red', hex: '#cc0000' },
+    { id: 'blue', name: 'Blue', hex: '#0000cc', hidden: true },
+  ];
+  const fresh = makePaintingPsd(ink, layout, assignments, roles, 'recolor');
+  const touchup = makePaintingPsd(ink, layout, assignments, roles, 'touchup');
+  assert.deepEqual(fresh.stack.map(layer => layer.label), ['ペン', '彩色', 'トレス色', 'Red', 'Blue', '</Layer group>', '用紙']);
+  assert.deepEqual(touchup.stack.map(layer => layer.label).slice(0, 2), ['ペン', '加筆']);
+  assert.equal(fresh.stack[2].hidden, true);
+  assert.equal(touchup.stack[2].hidden, false);
+  assert.equal(fresh.stack[4].hidden, true);
+  assert.equal(fresh.stack[1].pixels.length, 0);
+  assert.deepEqual(fresh.flat.slice(0, 4), Uint8ClampedArray.of(255, 255, 255, 255));
+  assert.deepEqual(touchup.flat.slice(0, 4), Uint8ClampedArray.of(204, 0, 0, 255));
+  assert.deepEqual(touchup.flat.slice(8, 12), Uint8ClampedArray.of(255, 255, 255, 255));
+  assert.equal(roles[0].hidden, undefined);
+  const file = Buffer.concat(encode(ink, fresh.stack, fresh.flat, fresh.activeLayer));
+  assert.ok(file.includes('8BIMlsct'));
+  assert.ok(file.includes('8BIMlyid'));
+  assert.ok(file.includes('8BIMlspf'));
+  assert.equal(file.readUInt16BE(38), 1024);
+  assert.equal(file.readUInt16BE(46), fresh.stack.length - 1 - fresh.activeLayer);
+  assert.equal(file.readUInt32BE(62), fresh.stack.length - fresh.activeLayer);
+  assert.throws(() => makePaintingPsd(ink, layout, assignments, roles, 'unknown'), /PSD/);
+});
+
 test('PSD stores layer records and their channel payloads bottom to top', () => {
   const encode = require('./psd.js');
   const frame = { width: 1, height: 1 };

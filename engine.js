@@ -465,6 +465,26 @@
     ];
   }
 
+  function makePaintingPsd(ink, layout, assignments, roles, preset, byteLimit) {
+    if (preset !== 'recolor' && preset !== 'touchup') throw new Error('PSDの用途が不明です。');
+    const recolor = preset === 'recolor';
+    const base = makeLayers(ink, layout, assignments, roles, byteLimit);
+    const colors = base.slice(1, -1);
+    const empty = { top: 0, left: 0, width: 0, height: 0, pixels: new Uint8Array(0) };
+    const work = { ...empty, name: recolor ? 'Paint' : 'Touch-up', label: recolor ? '彩色' : '加筆' };
+    const group = colors.length ? [
+      { ...empty, name: 'Traced colors', label: 'トレス色', divider: 2, hidden: recolor },
+      ...colors,
+      { ...empty, name: '</Layer group>', label: '</Layer group>', divider: 3 },
+    ] : [];
+    const palette = recolor ? {} : Object.fromEntries(roles.filter(role => !role.hidden).map(role => [role.id, role.hex]));
+    return {
+      stack: [{ ...base[0], locked: true }, work, ...group, base.at(-1)],
+      flat: paint(ink, layout, assignments, palette),
+      activeLayer: 1,
+    };
+  }
+
   function makeSvg({ width, height }, contours, layers, edgeLimit = Infinity) {
     function paths(shapes) {
       return shapes.map(({ points }) => 'M' + points.map(([x, y]) => x + ' ' + y).join('L') + 'Z').join('');
@@ -484,7 +504,7 @@
   }
 
   const engine = { segment, regionAt, resolveColors, paint, traceInk, rebuildInk, inkTimeline, traceWeight, inkCrossSection, stylizeInk,
-    inspectRaster, sampleColors, swatchHex, makeLayers, makeSvg };
+    inspectRaster, sampleColors, swatchHex, makeLayers, makePaintingPsd, makeSvg };
   if (typeof module !== 'undefined' && module.exports) module.exports = engine;
   else root.KomaEngine = engine;
 })(globalThis);

@@ -92,6 +92,17 @@ button[aria-pressed='true'] { background: var(--sheet); border-color: var(--line
 .art figcaption small:empty { display: none; }
 .art[data-variant='source'] .pending-trace { padding: 2px 6px; border-radius: 4px; background: #efe2ec; font-weight: 700; }
 .art-save { margin-inline-start: auto; padding: .25em .6em; font-size: 12px; }
+.painting-export { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.painting-heading, .painting-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.painting-heading { justify-content: space-between; margin-bottom: 8px; }
+.painting-heading h2 { margin: 0; font-size: 15px; }
+#painting-dimensions { color: var(--muted); font-size: 12px; }
+.painting-actions label { display: flex; align-items: center; gap: 6px; }
+#painting-preview { margin-top: 5px; }
+@media (max-width: 540px) {
+  .painting-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .painting-actions button { width: 100%; }
+}
 .art canvas, #movie { display: block; width: 100%; height: auto; max-height: 600px; object-fit: contain; background: white; border-radius: 6px; }
 .art[data-variant='a'] { border-top: 3px solid #aa7565; }
 .art[data-variant='b'] { border-top: 3px solid #8f68a3; }
